@@ -4,20 +4,54 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const app = express();
-app.use(express.json());
 
-// ========== ОБРАБОТКА ОШИБОК ==========
-app.use((err, req, res, next) => {
-  console.error('Ошибка:', err);
-  res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+// ========== РАЗБОР JSON С ОБРАБОТКОЙ ОШИБОК ==========
+app.use(express.json({ strict: false }));
+app.use(express.urlencoded({ extended: true }));
+
+// ========== ЛОГИРОВАНИЕ ВСЕХ ЗАПРОСОВ ==========
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path}`, req.body);
+  next();
 });
 
-const pool = createPool({
-  connectionString: process.env.POSTGRES_URL
+// ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ==========
+app.use((err, req, res, next) => {
+  console.error('💥 Global error:', err);
+  res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + err.message });
+});
+
+// ========== БАЗА ДАННЫХ ==========
+let pool;
+try {
+  pool = createPool({
+    connectionString: process.env.POSTGRES_URL
+  });
+  console.log('✅ База данных подключена');
+} catch (err) {
+  console.error('❌ Ошибка подключения к БД:', err);
+}
+
+// ========== ПРОВЕРКА ЗДОРОВЬЯ ==========
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    db: !!pool,
+    env: {
+      hasPostgres: !!process.env.POSTGRES_URL,
+      nodeEnv: process.env.NODE_ENV
+    }
+  });
 });
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 app.post('/api/init', async (req, res) => {
+  console.log('🔧 Init database...');
+  
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
   try {
     await pool.sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -38,21 +72,30 @@ app.post('/api/init', async (req, res) => {
         timestamp TIMESTAMP DEFAULT NOW()
       );
     `;
+    console.log('✅ Таблицы созданы');
     res.json({ success: true, message: '✅ Таблицы созданы' });
   } catch (error) {
-    console.error('Init error:', error);
+    console.error('❌ Init error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ========== РЕГИСТРАЦИЯ ==========
 app.post('/api/register', async (req, res) => {
-  console.log('📝 Регистрация:', req.body);
+  console.log('📝 Регистрация, body:', req.body);
   
-  const { email, name, nickname, password } = req.body;
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
+  const { email, name, nickname, password } = req.body || {};
 
   if (!email || !name || !nickname || !password) {
     return res.status(400).json({ error: '❌ Все поля обязательны' });
+  }
+
+  if (password.length < 4) {
+    return res.status(400).json({ error: '❌ Пароль минимум 4 символа' });
   }
 
   try {
@@ -72,7 +115,7 @@ app.post('/api/register', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Register error:', error);
-    if (error.message.includes('duplicate key')) {
+    if (error.message?.includes('duplicate key')) {
       res.status(400).json({ error: '❌ Email или никнейм уже занят' });
     } else {
       res.status(500).json({ error: '❌ Ошибка сервера: ' + error.message });
@@ -82,9 +125,13 @@ app.post('/api/register', async (req, res) => {
 
 // ========== ВХОД ==========
 app.post('/api/login', async (req, res) => {
-  console.log('🔑 Вход:', req.body.email);
+  console.log('🔑 Вход, body:', req.body);
   
-  const { email, password } = req.body;
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
+  const { email, password } = req.body || {};
 
   if (!email || !password) {
     return res.status(400).json({ error: '❌ Email и пароль обязательны' });
@@ -122,13 +169,20 @@ app.post('/api/login', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Login error:', error);
-    res.status(500).json({ error: '❌ Ошибка сервера' });
+    res.status(500).json({ error: '❌ Ошибка сервера: ' + error.message });
   }
 });
 
-// ========== ПОЛУЧИТЬ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ ==========
+// ========== ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ ==========
 app.get('/api/me', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  console.log('👤 Get me');
+  
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
   
   if (!token) {
     return res.status(401).json({ error: '❌ Нет токена' });
@@ -153,14 +207,21 @@ app.get('/api/me', async (req, res) => {
 
 // ========== ПОИСК ==========
 app.get('/api/search/:nickname', async (req, res) => {
+  console.log('🔍 Search:', req.params.nickname);
+  
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
   const { nickname } = req.params;
+  const exclude = req.query.exclude || 0;
   
   try {
     const { rows } = await pool.sql`
       SELECT id, name, nickname 
       FROM users 
       WHERE nickname ILIKE ${nickname + '%'}
-        AND id != ${req.query.exclude || 0}
+        AND id != ${exclude}
       LIMIT 20
     `;
     res.json(rows);
@@ -170,9 +231,15 @@ app.get('/api/search/:nickname', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВИТЬ СООБЩЕНИЕ ==========
+// ========== ОТПРАВКА СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
-  const { from_user, to_user, content } = req.body;
+  console.log('💬 Message:', req.body);
+  
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
+  const { from_user, to_user, content } = req.body || {};
 
   if (!from_user || !to_user || !content) {
     return res.status(400).json({ error: '❌ Все поля обязательны' });
@@ -192,6 +259,12 @@ app.post('/api/message', async (req, res) => {
 
 // ========== ИСТОРИЯ ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
+  console.log('📜 Messages:', req.params);
+  
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
   const { user1, user2 } = req.params;
 
   try {
@@ -214,8 +287,14 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
   }
 });
 
-// ========== СПИСОК ДИАЛОГОВ ==========
+// ========== СПИСОК ЧАТОВ ==========
 app.get('/api/chats/:userId', async (req, res) => {
+  console.log('💬 Chats for user:', req.params.userId);
+  
+  if (!pool) {
+    return res.status(500).json({ error: 'База данных не подключена' });
+  }
+
   const { userId } = req.params;
 
   try {
@@ -246,6 +325,11 @@ app.get('/api/chats/:userId', async (req, res) => {
     console.error('❌ Chats error:', error);
     res.status(500).json({ error: '❌ Ошибка загрузки чатов' });
   }
+});
+
+// ========== ОБРАБОТКА 404 ==========
+app.use('*', (req, res) => {
+  res.status(404).json({ error: '❌ Маршрут не найден: ' + req.path });
 });
 
 export default app;
