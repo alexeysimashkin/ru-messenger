@@ -1,3 +1,0 @@
-git rm vercel.json
-git commit -m "Remove vercel.json - Vercel auto-detects"
-git push
