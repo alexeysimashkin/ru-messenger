@@ -4,24 +4,15 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const app = express();
+app.use(express.json());
 
-// ========== РАЗБОР JSON С ОБРАБОТКОЙ ОШИБОК ==========
-app.use(express.json({ strict: false }));
-app.use(express.urlencoded({ extended: true }));
-
-// ========== ЛОГИРОВАНИЕ ВСЕХ ЗАПРОСОВ ==========
+// ========== ЛОГИРОВАНИЕ ==========
 app.use((req, res, next) => {
-  console.log(`📨 ${req.method} ${req.path}`, req.body);
+  console.log(`📨 ${req.method} ${req.path}`);
   next();
 });
 
-// ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК ==========
-app.use((err, req, res, next) => {
-  console.error('💥 Global error:', err);
-  res.status(500).json({ error: 'Внутренняя ошибка сервера: ' + err.message });
-});
-
-// ========== БАЗА ДАННЫХ ==========
+// ========== ПРОВЕРКА БАЗЫ ==========
 let pool;
 try {
   pool = createPool({
@@ -29,29 +20,11 @@ try {
   });
   console.log('✅ База данных подключена');
 } catch (err) {
-  console.error('❌ Ошибка подключения к БД:', err);
+  console.error('❌ Ошибка БД:', err);
 }
 
-// ========== ПРОВЕРКА ЗДОРОВЬЯ ==========
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    db: !!pool,
-    env: {
-      hasPostgres: !!process.env.POSTGRES_URL,
-      nodeEnv: process.env.NODE_ENV
-    }
-  });
-});
-
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
+// ========== ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ ==========
 app.post('/api/init', async (req, res) => {
-  console.log('🔧 Init database...');
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
   try {
     await pool.sql`
       CREATE TABLE IF NOT EXISTS users (
@@ -61,7 +34,7 @@ app.post('/api/init', async (req, res) => {
         nickname TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
-      );
+      )
     `;
     await pool.sql`
       CREATE TABLE IF NOT EXISTS messages (
@@ -70,68 +43,46 @@ app.post('/api/init', async (req, res) => {
         to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
         content TEXT NOT NULL,
         timestamp TIMESTAMP DEFAULT NOW()
-      );
+      )
     `;
-    console.log('✅ Таблицы созданы');
     res.json({ success: true, message: '✅ Таблицы созданы' });
   } catch (error) {
-    console.error('❌ Init error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ========== РЕГИСТРАЦИЯ ==========
 app.post('/api/register', async (req, res) => {
-  console.log('📝 Регистрация, body:', req.body);
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
-  const { email, name, nickname, password } = req.body || {};
+  const { email, name, nickname, password } = req.body;
 
   if (!email || !name || !nickname || !password) {
     return res.status(400).json({ error: '❌ Все поля обязательны' });
   }
 
-  if (password.length < 4) {
-    return res.status(400).json({ error: '❌ Пароль минимум 4 символа' });
-  }
-
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    
     const result = await pool.sql`
       INSERT INTO users (email, name, nickname, password)
       VALUES (${email}, ${name}, ${nickname}, ${hashedPassword})
       RETURNING id, email, name, nickname
     `;
-    
-    console.log('✅ Пользователь создан:', result.rows[0]);
     res.json({ 
       success: true, 
       message: '✅ Регистрация успешна!',
       user: result.rows[0]
     });
   } catch (error) {
-    console.error('❌ Register error:', error);
     if (error.message?.includes('duplicate key')) {
       res.status(400).json({ error: '❌ Email или никнейм уже занят' });
     } else {
-      res.status(500).json({ error: '❌ Ошибка сервера: ' + error.message });
+      res.status(500).json({ error: '❌ Ошибка сервера' });
     }
   }
 });
 
 // ========== ВХОД ==========
 app.post('/api/login', async (req, res) => {
-  console.log('🔑 Вход, body:', req.body);
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
-  const { email, password } = req.body || {};
+  const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: '❌ Email и пароль обязательны' });
@@ -146,14 +97,14 @@ app.post('/api/login', async (req, res) => {
       return res.status(400).json({ error: '❌ Пользователь не найден' });
     }
 
-    const validPassword = await bcrypt.compare(password, rows[0].password);
-    if (!validPassword) {
+    const valid = await bcrypt.compare(password, rows[0].password);
+    if (!valid) {
       return res.status(400).json({ error: '❌ Неверный пароль' });
     }
 
     const token = jwt.sign(
-      { id: rows[0].id, email: rows[0].email },
-      process.env.JWT_SECRET || 'secret_key_123',
+      { id: rows[0].id },
+      process.env.JWT_SECRET || 'secret',
       { expiresIn: '30d' }
     );
 
@@ -168,28 +119,20 @@ app.post('/api/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
-    res.status(500).json({ error: '❌ Ошибка сервера: ' + error.message });
+    res.status(500).json({ error: '❌ Ошибка сервера' });
   }
 });
 
 // ========== ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ ==========
 app.get('/api/me', async (req, res) => {
-  console.log('👤 Get me');
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.split(' ')[1];
+  const token = req.headers.authorization?.split(' ')[1];
   
   if (!token) {
     return res.status(401).json({ error: '❌ Нет токена' });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key_123');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
     const { rows } = await pool.sql`
       SELECT id, email, name, nickname FROM users WHERE id = ${decoded.id}
     `;
@@ -200,19 +143,12 @@ app.get('/api/me', async (req, res) => {
     
     res.json(rows[0]);
   } catch (error) {
-    console.error('❌ Me error:', error);
     res.status(401).json({ error: '❌ Неверный токен' });
   }
 });
 
 // ========== ПОИСК ==========
 app.get('/api/search/:nickname', async (req, res) => {
-  console.log('🔍 Search:', req.params.nickname);
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
   const { nickname } = req.params;
   const exclude = req.query.exclude || 0;
   
@@ -226,20 +162,13 @@ app.get('/api/search/:nickname', async (req, res) => {
     `;
     res.json(rows);
   } catch (error) {
-    console.error('❌ Search error:', error);
     res.status(500).json({ error: '❌ Ошибка поиска' });
   }
 });
 
 // ========== ОТПРАВКА СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
-  console.log('💬 Message:', req.body);
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
-  const { from_user, to_user, content } = req.body || {};
+  const { from_user, to_user, content } = req.body;
 
   if (!from_user || !to_user || !content) {
     return res.status(400).json({ error: '❌ Все поля обязательны' });
@@ -252,19 +181,12 @@ app.post('/api/message', async (req, res) => {
     `;
     res.json({ success: true });
   } catch (error) {
-    console.error('❌ Message error:', error);
     res.status(500).json({ error: '❌ Ошибка отправки' });
   }
 });
 
 // ========== ИСТОРИЯ ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
-  console.log('📜 Messages:', req.params);
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
   const { user1, user2 } = req.params;
 
   try {
@@ -282,19 +204,12 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
     `;
     res.json(rows);
   } catch (error) {
-    console.error('❌ Messages error:', error);
     res.status(500).json({ error: '❌ Ошибка загрузки' });
   }
 });
 
 // ========== СПИСОК ЧАТОВ ==========
 app.get('/api/chats/:userId', async (req, res) => {
-  console.log('💬 Chats for user:', req.params.userId);
-  
-  if (!pool) {
-    return res.status(500).json({ error: 'База данных не подключена' });
-  }
-
   const { userId } = req.params;
 
   try {
@@ -322,14 +237,26 @@ app.get('/api/chats/:userId', async (req, res) => {
     `;
     res.json(rows);
   } catch (error) {
-    console.error('❌ Chats error:', error);
     res.status(500).json({ error: '❌ Ошибка загрузки чатов' });
   }
 });
 
+// ========== HEALTH CHECK ==========
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: '✅ API работает!',
+    timestamp: new Date().toISOString(),
+    postgres: !!pool
+  });
+});
+
 // ========== ОБРАБОТКА 404 ==========
 app.use('*', (req, res) => {
-  res.status(404).json({ error: '❌ Маршрут не найден: ' + req.path });
+  res.status(404).json({ 
+    error: '❌ Маршрут не найден',
+    path: req.path
+  });
 });
 
 export default app;
