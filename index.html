@@ -3,261 +3,512 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RU Мессенджер</title>
+  <title>RU — Мессенджер</title>
   <style>
+    /* ========== ОБЩИЕ СТИЛИ ========== */
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
     }
-    
+
     #app {
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-      padding: 30px;
-      max-width: 500px;
-      width: 90%;
-      max-height: 90vh;
-      overflow-y: auto;
+      width: 100%;
+      max-width: 480px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 32px;
+      padding: 40px 32px;
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+      animation: slideUp 0.5s ease;
     }
-    
-    h1, h2 {
-      color: #1a1a1a;
-      margin-bottom: 20px;
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    
-    h1 {
-      font-size: 28px;
+
+    /* ========== ЛОГОТИП ========== */
+    .logo {
       text-align: center;
+      margin-bottom: 36px;
     }
-    
-    h2 {
-      font-size: 20px;
+
+    .logo-icon {
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 32px;
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4);
     }
-    
-    .form-group {
-      margin-bottom: 15px;
+
+    .logo h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a1a;
+      letter-spacing: -0.5px;
     }
-    
-    input {
-      width: 100%;
-      padding: 12px 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
+
+    .logo h1 span {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo p {
+      color: #888;
       font-size: 14px;
-      transition: border-color 0.3s;
+      margin-top: 4px;
     }
-    
-    input:focus {
-      outline: none;
-      border-color: #6c63ff;
+
+    /* ========== ФОРМА ========== */
+    .form-group {
+      margin-bottom: 16px;
+      position: relative;
     }
-    
-    button {
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
       width: 100%;
-      padding: 12px;
-      background: #6c63ff;
+      padding: 14px 16px;
+      border: 2px solid #e8e8e8;
+      border-radius: 16px;
+      font-size: 15px;
+      transition: all 0.3s;
+      background: #f8f8fa;
+      color: #1a1a1a;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+      background: white;
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-group input::placeholder {
+      color: #aaa;
+    }
+
+    /* ========== КНОПКИ ========== */
+    .btn-primary {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
       border: none;
-      border-radius: 12px;
+      border-radius: 16px;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
       margin-top: 8px;
+      letter-spacing: 0.3px;
     }
-    
-    button:hover {
-      background: #5a52d5;
+
+    .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(108, 99, 255, 0.3);
+      box-shadow: 0 12px 30px rgba(102, 126, 234, 0.4);
     }
-    
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
     .btn-secondary {
-      background: #e0e0e0;
+      width: 100%;
+      padding: 14px;
+      background: transparent;
+      color: #667eea;
+      border: 2px solid #667eea;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .btn-secondary:hover {
+      background: #667eea;
+      color: white;
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    /* ========== ПЕРЕКЛЮЧАТЕЛЬ ========== */
+    .auth-toggle {
+      text-align: center;
+      margin-top: 20px;
+      color: #888;
+      font-size: 14px;
+    }
+
+    .auth-toggle span {
+      color: #667eea;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .auth-toggle span:hover {
+      color: #764ba2;
+      text-decoration: underline;
+    }
+
+    /* ========== РАЗДЕЛИТЕЛЬ ========== */
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 24px 0;
+      color: #ccc;
+      font-size: 12px;
+      gap: 16px;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e8e8e8;
+    }
+
+    /* ========== ОШИБКИ ========== */
+    .error-message {
+      background: #fee;
+      color: #e74c3c;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+      border-left: 4px solid #e74c3c;
+    }
+
+    .error-message.show {
+      display: block;
+      animation: shake 0.3s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    /* ========== АДАПТИВ ========== */
+    @media (max-width: 480px) {
+      #app {
+        padding: 30px 20px;
+        border-radius: 24px;
+      }
+
+      .logo-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 26px;
+      }
+
+      .logo h1 {
+        font-size: 24px;
+      }
+
+      .form-group input {
+        padding: 12px 14px;
+        font-size: 14px;
+      }
+    }
+
+    /* ========== АНИМАЦИЯ ПОЯВЛЕНИЯ ПОЛЕЙ ========== */
+    .form-group {
+      animation: fadeIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .form-group:nth-child(1) { animation-delay: 0.1s; }
+    .form-group:nth-child(2) { animation-delay: 0.2s; }
+    .form-group:nth-child(3) { animation-delay: 0.3s; }
+    .form-group:nth-child(4) { animation-delay: 0.4s; }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* ========== ИНДИКАТОР ЗАГРУЗКИ ========== */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ========== ИНТЕРФЕЙС ЧАТА (стили остаются, но чуть обновлены) ========== */
+    .user-info {
+      background: linear-gradient(135deg, #f8f8fa, #f0f0f5);
+      padding: 14px 20px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .user-info .avatar {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .user-info .user-details {
+      flex: 1;
+      margin-left: 12px;
+    }
+
+    .user-info .user-details .name {
+      font-weight: 600;
       color: #1a1a1a;
     }
-    
-    .btn-secondary:hover {
-      background: #d0d0d0;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+
+    .user-info .user-details .nickname {
+      font-size: 13px;
+      color: #888;
     }
-    
+
+    .user-info .logout-btn {
+      background: none;
+      border: none;
+      color: #e74c3c;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+
+    .user-info .logout-btn:hover {
+      background: #fee;
+    }
+
     .contact {
-      padding: 12px 16px;
-      background: #f8f8f8;
-      border-radius: 12px;
+      padding: 14px 16px;
+      background: #f8f8fa;
+      border-radius: 14px;
       margin-bottom: 8px;
       cursor: pointer;
       transition: all 0.3s;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border: 2px solid transparent;
     }
-    
+
     .contact:hover {
-      background: #6c63ff;
-      color: white;
-      transform: translateX(5px);
+      background: white;
+      border-color: #667eea;
+      transform: translateX(4px);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
     }
-    
+
     .contact .name {
       font-weight: 600;
-    }
-    
-    .contact .nickname {
-      opacity: 0.7;
-      font-size: 13px;
-    }
-    
-    .messages-container {
-      margin: 15px 0;
-      max-height: 300px;
-      overflow-y: auto;
-      padding: 10px;
-      background: #fafafa;
-      border-radius: 12px;
-    }
-    
-    .message {
-      padding: 8px 12px;
-      margin: 5px 0;
-      border-radius: 12px;
-      max-width: 80%;
-      word-wrap: break-word;
-    }
-    
-    .message.my {
-      background: #6c63ff;
-      color: white;
-      margin-left: auto;
-    }
-    
-    .message.other {
-      background: #e8e8e8;
       color: #1a1a1a;
     }
-    
-    .message .sender {
-      font-size: 11px;
-      opacity: 0.7;
-      margin-bottom: 3px;
+
+    .contact .nickname {
+      font-size: 13px;
+      color: #888;
     }
-    
+
+    .contact .badge {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 2px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .messages-container {
+      max-height: 360px;
+      overflow-y: auto;
+      padding: 12px;
+      background: #f8f8fa;
+      border-radius: 16px;
+      margin: 12px 0;
+    }
+
+    .messages-container::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb {
+      background: #667eea;
+      border-radius: 10px;
+    }
+
+    .message {
+      padding: 10px 14px;
+      margin: 4px 0;
+      border-radius: 14px;
+      max-width: 85%;
+      word-wrap: break-word;
+      animation: slideUp 0.2s ease;
+    }
+
+    .message.my {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.other {
+      background: white;
+      color: #1a1a1a;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
     .message .time {
       font-size: 10px;
       opacity: 0.6;
-      margin-top: 3px;
+      margin-top: 4px;
       text-align: right;
     }
-    
-    .search-container {
+
+    .message.my .time {
+      color: rgba(255,255,255,0.7);
+    }
+
+    .input-container {
       display: flex;
       gap: 10px;
-      margin: 15px 0;
+      margin-top: 8px;
     }
-    
-    .search-container input {
+
+    .input-container input {
       flex: 1;
+      padding: 14px 16px;
+      border: 2px solid #e8e8e8;
+      border-radius: 16px;
+      font-size: 14px;
+      transition: all 0.3s;
+      background: #f8f8fa;
     }
-    
-    .search-container button {
-      width: auto;
-      padding: 12px 24px;
-      margin: 0;
+
+    .input-container input:focus {
+      outline: none;
+      border-color: #667eea;
+      background: white;
     }
-    
+
+    .input-container button {
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+
+    .input-container button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+
     .chat-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 15px 0;
+      gap: 12px;
+      padding-bottom: 12px;
       border-bottom: 2px solid #f0f0f0;
-      margin-bottom: 15px;
+      margin-bottom: 12px;
     }
-    
+
     .chat-header .back {
       background: none;
       border: none;
       font-size: 24px;
       cursor: pointer;
-      padding: 0 10px;
-      width: auto;
+      color: #667eea;
+      padding: 4px 8px;
+      transition: all 0.3s;
     }
-    
-    .input-container {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
+
+    .chat-header .back:hover {
+      transform: translateX(-4px);
     }
-    
-    .input-container input {
-      flex: 1;
-    }
-    
-    .input-container button {
-      width: auto;
-      padding: 12px 24px;
-      margin: 0;
-    }
-    
-    .auth-switch {
-      text-align: center;
-      margin-top: 15px;
-      color: #6c63ff;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    
-    .auth-switch:hover {
-      text-decoration: underline;
-    }
-    
-    .user-info {
-      background: #f8f8f8;
-      padding: 10px 16px;
-      border-radius: 12px;
-      margin-bottom: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .user-info .logout {
-      background: #ff4757;
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 12px;
-      width: auto;
-      margin: 0;
-    }
-    
-    .user-info .logout:hover {
-      background: #ff3838;
-    }
-    
+
     .empty {
       text-align: center;
-      color: #999;
-      padding: 30px 0;
+      color: #aaa;
+      padding: 40px 0;
+      font-size: 14px;
     }
-    
-    .badge {
-      background: #6c63ff;
-      color: white;
-      padding: 2px 10px;
-      border-radius: 20px;
-      font-size: 12px;
+
+    .empty .icon {
+      font-size: 48px;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    /* ========== СКРЫТЫЕ ЭЛЕМЕНТЫ ========== */
+    .hidden {
+      display: none !important;
     }
   </style>
 </head>
@@ -272,8 +523,9 @@
     let contacts = [];
     let messages = [];
     let isLoginMode = true;
+    let isLoading = false;
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+    // ========== ВСПОМОГАТЕЛЬНЫЕ ==========
     function formatTime(date) {
       return new Date(date).toLocaleTimeString('ru-RU', { 
         hour: '2-digit', 
@@ -281,38 +533,67 @@
       });
     }
 
+    function showError(message) {
+      const el = document.getElementById('errorMessage');
+      if (el) {
+        el.textContent = message;
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 4000);
+      } else {
+        alert(message);
+      }
+    }
+
     async function request(path, options = {}) {
       const headers = { 'Content-Type': 'application/json' };
-      
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch(API + path, {
-        ...options,
-        headers: { ...headers, ...options.headers }
-      });
+      try {
+        const response = await fetch(API + path, {
+          ...options,
+          headers: { ...headers, ...options.headers }
+        });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Ошибка запроса');
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Ошибка запроса');
+        }
+        
+        return data;
+      } catch (error) {
+        if (error.message === 'Failed to fetch') {
+          throw new Error('❌ Сервер недоступен. Проверьте подключение.');
+        }
+        throw error;
       }
-      
-      return data;
     }
 
     // ========== АВТОРИЗАЦИЯ ==========
     async function register() {
-      const email = document.getElementById('email').value;
-      const name = document.getElementById('name').value;
-      const nickname = document.getElementById('nickname').value;
+      if (isLoading) return;
+      
+      const email = document.getElementById('email').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const nickname = document.getElementById('nickname').value.trim();
       const password = document.getElementById('password').value;
 
       if (!email || !name || !nickname || !password) {
-        alert('Заполните все поля');
+        showError('❌ Заполните все поля');
         return;
       }
+
+      if (password.length < 4) {
+        showError('❌ Пароль должен быть минимум 4 символа');
+        return;
+      }
+
+      isLoading = true;
+      const btn = document.querySelector('.btn-primary');
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="loading"></span>';
 
       try {
         const data = await request('/register', {
@@ -321,23 +602,35 @@
         });
         
         if (data.success) {
-          alert('✅ Регистрация успешна! Теперь войдите.');
-          isLoginMode = true;
-          renderAuth();
+          showError('✅ ' + data.message);
+          setTimeout(() => {
+            isLoginMode = true;
+            renderAuth();
+          }, 1000);
         }
       } catch (error) {
-        alert('❌ ' + error.message);
+        showError(error.message);
+      } finally {
+        isLoading = false;
+        btn.textContent = originalText;
       }
     }
 
     async function login() {
-      const email = document.getElementById('email').value;
+      if (isLoading) return;
+
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
 
       if (!email || !password) {
-        alert('Заполните email и пароль');
+        showError('❌ Заполните email и пароль');
         return;
       }
+
+      isLoading = true;
+      const btn = document.querySelector('.btn-primary');
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="loading"></span>';
 
       try {
         const data = await request('/login', {
@@ -350,7 +643,10 @@
         localStorage.setItem('token', token);
         renderApp();
       } catch (error) {
-        alert('❌ ' + error.message);
+        showError(error.message);
+      } finally {
+        isLoading = false;
+        btn.textContent = originalText;
       }
     }
 
@@ -362,7 +658,7 @@
       renderAuth();
     }
 
-    // ========== ПОИСК ==========
+    // ========== ПОИСК И ЧАТ ==========
     async function searchUsers() {
       const query = document.getElementById('searchInput').value.trim();
       
@@ -373,22 +669,21 @@
       }
 
       try {
-        const data = await request('/search/' + encodeURIComponent(query));
-        contacts = data.filter(u => u.id !== currentUser.id);
+        const data = await request('/search/' + encodeURIComponent(query) + `?exclude=${currentUser.id}`);
+        contacts = data;
         renderContacts();
       } catch (error) {
-        alert('❌ ' + error.message);
+        showError(error.message);
       }
     }
 
-    // ========== СООБЩЕНИЯ ==========
     async function loadMessages(userId) {
       try {
         const data = await request(`/messages/${currentUser.id}/${userId}`);
         messages = data;
         renderMessages();
       } catch (error) {
-        alert('❌ ' + error.message);
+        showError(error.message);
       }
     }
 
@@ -410,7 +705,7 @@
         document.getElementById('messageInput').value = '';
         await loadMessages(selectedUser.id);
       } catch (error) {
-        alert('❌ ' + error.message);
+        showError(error.message);
       }
     }
 
@@ -420,7 +715,7 @@
         contacts = data;
         renderContacts();
       } catch (error) {
-        alert('❌ ' + error.message);
+        showError(error.message);
       }
     }
 
@@ -430,6 +725,7 @@
       document.getElementById('chatView').style.display = 'block';
       document.getElementById('contactsView').style.display = 'none';
       document.getElementById('selectedUserName').textContent = user.name;
+      document.getElementById('selectedUserNickname').textContent = '@' + user.nickname;
       loadMessages(user.id);
     }
 
@@ -444,7 +740,12 @@
       const container = document.getElementById('contactsList');
       
       if (contacts.length === 0) {
-        container.innerHTML = '<div class="empty">🤷‍♂️ Никого не найдено</div>';
+        container.innerHTML = `
+          <div class="empty">
+            <span class="icon">🔍</span>
+            Никого не найдено
+          </div>
+        `;
         return;
       }
 
@@ -454,7 +755,7 @@
             <div class="name">${c.name}</div>
             <div class="nickname">@${c.nickname}</div>
           </div>
-          ${c.last_message ? `<span class="badge">${c.last_message.slice(0, 30)}...</span>` : ''}
+          ${c.last_message ? `<span class="badge">${c.last_message.slice(0, 30)}${c.last_message.length > 30 ? '...' : ''}</span>` : ''}
         </div>
       `).join('');
     }
@@ -463,7 +764,12 @@
       const container = document.getElementById('messagesList');
       
       if (messages.length === 0) {
-        container.innerHTML = '<div class="empty">💬 Начните переписку</div>';
+        container.innerHTML = `
+          <div class="empty">
+            <span class="icon">💬</span>
+            Начните переписку
+          </div>
+        `;
         return;
       }
 
@@ -471,68 +777,93 @@
         const isMy = m.from_user === currentUser.id;
         return `
           <div class="message ${isMy ? 'my' : 'other'}">
-            ${!isMy ? `<div class="sender">${m.from_name}</div>` : ''}
+            ${!isMy ? `<div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${m.from_name}</div>` : ''}
             ${m.content}
             <div class="time">${formatTime(m.timestamp)}</div>
           </div>
         `;
       }).join('');
       
-      container.scrollTop = container.scrollHeight;
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 50);
     }
 
+    // ========== ЭКРАН АВТОРИЗАЦИИ ==========
     function renderAuth() {
       document.getElementById('app').innerHTML = `
-        <h1>💬 RU Мессенджер</h1>
-        
-        <div class="form-group">
-          <input id="email" type="email" placeholder="Email" />
+        <div class="logo">
+          <div class="logo-icon">RU</div>
+          <h1>Мессенджер <span>RU</span></h1>
+          <p>${isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт'}</p>
         </div>
-        
-        ${isLoginMode ? '' : `
+
+        <div id="errorMessage" class="error-message"></div>
+
+        <form id="authForm" onsubmit="event.preventDefault(); ${isLoginMode ? 'login()' : 'register()'}">
           <div class="form-group">
-            <input id="name" placeholder="Имя" />
+            <label>Email</label>
+            <input id="email" type="email" placeholder="example@mail.ru" required autocomplete="email" />
           </div>
+
+          ${!isLoginMode ? `
+            <div class="form-group">
+              <label>Имя</label>
+              <input id="name" placeholder="Алексей" required />
+            </div>
+            <div class="form-group">
+              <label>Никнейм</label>
+              <input id="nickname" placeholder="alex92" required />
+            </div>
+          ` : ''}
+
           <div class="form-group">
-            <input id="nickname" placeholder="Никнейм" />
+            <label>Пароль</label>
+            <input id="password" type="password" placeholder="${isLoginMode ? 'Введите пароль' : 'Минимум 4 символа'}" required />
           </div>
-        `}
-        
-        <div class="form-group">
-          <input id="password" type="password" placeholder="Пароль" />
-        </div>
-        
-        <button onclick="${isLoginMode ? 'login()' : 'register()'}">
-          ${isLoginMode ? 'Войти' : 'Зарегистрироваться'}
-        </button>
-        
-        <div class="auth-switch" onclick="isLoginMode = !isLoginMode; renderAuth();">
-          ${isLoginMode ? 'Нет аккаунта? Зарегистрируйтесь' : 'Уже есть аккаунт? Войдите'}
+
+          <button type="submit" class="btn-primary">
+            ${isLoginMode ? 'Войти' : 'Создать аккаунт'}
+          </button>
+        </form>
+
+        <div class="auth-toggle">
+          ${isLoginMode ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}
+          <span onclick="isLoginMode = !isLoginMode; renderAuth();">
+            ${isLoginMode ? 'Зарегистрироваться' : 'Войти'}
+          </span>
         </div>
       `;
 
       // Отправка по Enter
       document.getElementById('password').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+          e.preventDefault();
           isLoginMode ? login() : register();
         }
       });
     }
 
+    // ========== ЭКРАН ЧАТА ==========
     function renderApp() {
+      const avatar = currentUser.name.charAt(0).toUpperCase();
+      
       document.getElementById('app').innerHTML = `
         <div class="user-info">
-          <div>
-            <strong>${currentUser.name}</strong> 
-            <span style="opacity:0.6;font-size:13px;">@${currentUser.nickname}</span>
+          <div style="display:flex;align-items:center;">
+            <div class="avatar">${avatar}</div>
+            <div class="user-details">
+              <div class="name">${currentUser.name}</div>
+              <div class="nickname">@${currentUser.nickname}</div>
+            </div>
           </div>
-          <button class="logout" onclick="logout()">Выйти</button>
+          <button class="logout-btn" onclick="logout()" title="Выйти">⏻</button>
         </div>
 
         <div id="contactsView">
-          <div class="search-container">
-            <input id="searchInput" placeholder="🔍 Поиск по никнейму" />
-            <button onclick="searchUsers()">Найти</button>
+          <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <input id="searchInput" placeholder="🔍 Найти по никнейму..." style="flex:1;padding:12px 16px;border:2px solid #e8e8e8;border-radius:14px;font-size:14px;transition:all 0.3s;background:#f8f8fa;" />
+            <button onclick="searchUsers()" style="padding:12px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:14px;font-weight:600;cursor:pointer;transition:all 0.3s;">Найти</button>
           </div>
           
           <div id="contactsList"></div>
@@ -541,8 +872,10 @@
         <div id="chatView" style="display:none;">
           <div class="chat-header">
             <button class="back" onclick="goBack()">←</button>
-            <span id="selectedUserName" style="font-weight:600;"></span>
-            <span style="opacity:0.6;font-size:13px;" id="selectedUserNickname"></span>
+            <div>
+              <div id="selectedUserName" style="font-weight:600;color:#1a1a1a;"></div>
+              <div id="selectedUserNickname" style="font-size:13px;color:#888;"></div>
+            </div>
           </div>
           
           <div class="messages-container" id="messagesList"></div>
@@ -563,11 +896,10 @@
         if (e.key === 'Enter') sendMessage();
       });
 
-      // Загрузка чатов
       loadChats();
     }
 
-    // ========== ИНИЦИАЛИЗАЦИЯ ==========
+    // ========== ЗАПУСК ==========
     async function init() {
       if (token) {
         try {
@@ -584,6 +916,16 @@
       }
     }
 
+    // Инициализация базы при первом запуске
+    async function initDatabase() {
+      try {
+        await fetch(API + '/init', { method: 'POST' });
+      } catch (e) {
+        // Игнорируем
+      }
+    }
+    
+    initDatabase();
     init();
   </script>
 </body>
