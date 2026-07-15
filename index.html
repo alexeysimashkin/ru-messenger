@@ -204,7 +204,6 @@
       to { transform: rotate(360deg); }
     }
 
-    /* === Стили чата === */
     .user-info {
       background: #f8f8fa;
       padding: 14px 20px;
@@ -499,7 +498,6 @@
     let isLoginMode = true;
     let isLoading = false;
 
-    // ========== ВСПОМОГАТЕЛЬНЫЕ ==========
     function formatTime(date) {
       return new Date(date).toLocaleTimeString('ru-RU', { 
         hour: '2-digit', 
@@ -518,7 +516,7 @@
       }
     }
 
-    // ========== ГЛАВНАЯ ФУНКЦИЯ ЗАПРОСОВ (ИСПРАВЛЕННАЯ) ==========
+    // ========== ОСНОВНАЯ ФУНКЦИЯ ЗАПРОСОВ ==========
     async function request(path, options = {}) {
       const headers = { 'Content-Type': 'application/json' };
       if (token) {
@@ -531,7 +529,6 @@
           headers: { ...headers, ...options.headers }
         });
 
-        // ✅ Читаем как текст, чтобы не падать на пустом ответе
         const text = await response.text();
         
         if (!text) {
@@ -543,7 +540,7 @@
           data = JSON.parse(text);
         } catch (e) {
           console.error('❌ Невалидный JSON:', text);
-          throw new Error('Ошибка: сервер вернул невалидный ответ');
+          throw new Error('Сервер вернул невалидный ответ');
         }
         
         if (!response.ok) {
@@ -648,7 +645,7 @@
       renderAuth();
     }
 
-    // ========== ПОИСК И ЧАТ ==========
+    // ========== ПОИСК ==========
     async function searchUsers() {
       const query = document.getElementById('searchInput').value.trim();
       
@@ -667,13 +664,17 @@
       }
     }
 
+    // ========== СООБЩЕНИЯ (ИСПРАВЛЕННАЯ ФУНКЦИЯ) ==========
     async function loadMessages(userId) {
       try {
+        console.log('📥 Загрузка сообщений с пользователем:', userId);
         const data = await request(`/messages/${currentUser.id}/${userId}`);
+        console.log('✅ Получено сообщений:', data.length);
         messages = data;
         renderMessages();
       } catch (error) {
-        showError(error.message);
+        console.error('❌ Ошибка загрузки сообщений:', error);
+        showError('Ошибка загрузки сообщений: ' + error.message);
       }
     }
 
@@ -767,7 +768,7 @@
         const isMy = m.from_user === currentUser.id;
         return `
           <div class="message ${isMy ? 'my' : 'other'}">
-            ${!isMy ? `<div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${m.from_name}</div>` : ''}
+            ${!isMy ? `<div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${m.from_name || 'Собеседник'}</div>` : ''}
             ${m.content}
             <div class="time">${formatTime(m.timestamp)}</div>
           </div>
@@ -904,7 +905,7 @@
       }
     }
 
-    // Инициализация базы при первом запуске
+    // Инициализация базы
     async function initDatabase() {
       try {
         await fetch(API + '/init', { method: 'POST' });
