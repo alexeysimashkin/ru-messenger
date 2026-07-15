@@ -6,8 +6,6 @@ import jwt from 'jsonwebtoken';
 const app = express();
 app.use(express.json());
 
-console.log('🔍 POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
-
 let pool = null;
 
 try {
@@ -26,8 +24,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    postgres: !!pool,
-    hasPostgresUrl: !!process.env.POSTGRES_URL
+    postgres: !!pool
   });
 });
 
@@ -227,7 +224,7 @@ app.post('/api/message', async (req, res) => {
   }
 });
 
-// ========== ИСТОРИЯ СООБЩЕНИЙ (ИСПРАВЛЕННАЯ) ==========
+// ========== ИСТОРИЯ СООБЩЕНИЙ (УПРОЩЁННАЯ) ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
   console.log('📜 Запрос истории:', req.params);
   
@@ -237,12 +234,18 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
 
   const { user1, user2 } = req.params;
 
-  // Проверка, что оба параметра — числа
-  const id1 = parseInt(user1);
-  const id2 = parseInt(user2);
+  // Преобразуем в числа
+  const id1 = Number(user1);
+  const id2 = Number(user2);
 
-  if (isNaN(id1) || isNaN(id2)) {
-    return res.status(400).json({ error: '❌ Неверные ID пользователей' });
+  console.log(`📊 ID1: ${id1} (${typeof id1}), ID2: ${id2} (${typeof id2})`);
+
+  if (isNaN(id1) || isNaN(id2) || id1 <= 0 || id2 <= 0) {
+    console.error('❌ Неверные ID:', { user1, user2, id1, id2 });
+    return res.status(400).json({ 
+      error: '❌ Неверные ID пользователей',
+      details: { user1, user2, id1, id2 }
+    });
   }
 
   try {
@@ -280,9 +283,9 @@ app.get('/api/chats/:userId', async (req, res) => {
   }
 
   const { userId } = req.params;
-  const id = parseInt(userId);
+  const id = Number(userId);
 
-  if (isNaN(id)) {
+  if (isNaN(id) || id <= 0) {
     return res.status(400).json({ error: '❌ Неверный ID пользователя' });
   }
 
