@@ -6,10 +6,8 @@ import jwt from 'jsonwebtoken';
 const app = express();
 app.use(express.json());
 
-// ========== ПРОВЕРКА ПЕРЕМЕННЫХ ==========
 console.log('🔍 POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
 
-// ========== ПОДКЛЮЧЕНИЕ К БАЗЕ ==========
 let pool = null;
 
 try {
@@ -18,8 +16,6 @@ try {
       connectionString: process.env.POSTGRES_URL
     });
     console.log('✅ База данных подключена');
-  } else {
-    console.log('⚠️ POSTGRES_URL не найдена');
   }
 } catch (err) {
   console.error('❌ Ошибка подключения к БД:', err.message);
@@ -29,20 +25,16 @@ try {
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    message: '✅ API работает!',
     timestamp: new Date().toISOString(),
     postgres: !!pool,
     hasPostgresUrl: !!process.env.POSTGRES_URL
   });
 });
 
-// ========== ИНИЦИАЛИЗАЦИЯ БАЗЫ ==========
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
 app.post('/api/init', async (req, res) => {
   if (!pool) {
-    return res.status(500).json({ 
-      error: '❌ База данных не подключена',
-      solution: 'Добавь Postgres в Vercel (Storage → Create Database)'
-    });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   try {
@@ -74,10 +66,8 @@ app.post('/api/init', async (req, res) => {
 
 // ========== РЕГИСТРАЦИЯ ==========
 app.post('/api/register', async (req, res) => {
-  console.log('📝 Регистрация:', req.body);
-  
   if (!pool) {
-    return res.status(500).json({ error: '❌ База данных не подключена' });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   const { email, name, nickname, password } = req.body;
@@ -103,17 +93,15 @@ app.post('/api/register', async (req, res) => {
     if (error.message?.includes('duplicate key')) {
       res.status(400).json({ error: '❌ Email или никнейм уже занят' });
     } else {
-      res.status(500).json({ error: '❌ Ошибка сервера: ' + error.message });
+      res.status(500).json({ error: '❌ Ошибка сервера' });
     }
   }
 });
 
 // ========== ВХОД ==========
 app.post('/api/login', async (req, res) => {
-  console.log('🔑 Вход:', req.body.email);
-  
   if (!pool) {
-    return res.status(500).json({ error: '❌ База данных не подключена' });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   const { email, password } = req.body;
@@ -154,7 +142,7 @@ app.post('/api/login', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Login error:', error);
-    res.status(500).json({ error: '❌ Ошибка сервера: ' + error.message });
+    res.status(500).json({ error: '❌ Ошибка сервера' });
   }
 });
 
@@ -167,7 +155,7 @@ app.get('/api/me', async (req, res) => {
   }
 
   if (!pool) {
-    return res.status(500).json({ error: '❌ База данных не подключена' });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   try {
@@ -187,21 +175,15 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
-// ========== ПОИСК (ИСПРАВЛЕННЫЙ) ==========
+// ========== ПОИСК ==========
 app.get('/api/search/:nickname', async (req, res) => {
-  console.log('🔍 Поиск:', req.params.nickname);
-  
   if (!pool) {
-    return res.status(500).json({ 
-      error: '❌ База данных не подключена',
-      solution: 'Добавь Postgres в Vercel'
-    });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   const { nickname } = req.params;
   const exclude = parseInt(req.query.exclude) || 0;
   
-  // Если никнейм пустой - возвращаем пустой массив
   if (!nickname || nickname.trim() === '') {
     return res.json([]);
   }
@@ -214,21 +196,17 @@ app.get('/api/search/:nickname', async (req, res) => {
         AND id != ${exclude}
       LIMIT 20
     `;
-    
-    console.log(`✅ Найдено ${rows.length} пользователей`);
     res.json(rows);
   } catch (error) {
     console.error('❌ Search error:', error);
-    res.status(500).json({ 
-      error: '❌ Ошибка поиска: ' + error.message 
-    });
+    res.status(500).json({ error: '❌ Ошибка поиска' });
   }
 });
 
 // ========== ОТПРАВКА СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) {
-    return res.status(500).json({ error: '❌ База данных не подключена' });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   const { from_user, to_user, content } = req.body;
@@ -249,63 +227,86 @@ app.post('/api/message', async (req, res) => {
   }
 });
 
-// ========== ИСТОРИЯ ==========
+// ========== ИСТОРИЯ СООБЩЕНИЙ (ИСПРАВЛЕННАЯ) ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
+  console.log('📜 Запрос истории:', req.params);
+  
   if (!pool) {
-    return res.status(500).json({ error: '❌ База данных не подключена' });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   const { user1, user2 } = req.params;
 
+  // Проверка, что оба параметра — числа
+  const id1 = parseInt(user1);
+  const id2 = parseInt(user2);
+
+  if (isNaN(id1) || isNaN(id2)) {
+    return res.status(400).json({ error: '❌ Неверные ID пользователей' });
+  }
+
   try {
     const { rows } = await pool.sql`
       SELECT 
-        m.*,
+        m.id,
+        m.from_user,
+        m.to_user,
+        m.content,
+        m.timestamp,
         u1.name as from_name,
         u2.name as to_name
       FROM messages m
-      JOIN users u1 ON m.from_user = u1.id
-      JOIN users u2 ON m.to_user = u2.id
-      WHERE (m.from_user = ${user1} AND m.to_user = ${user2})
-         OR (m.from_user = ${user2} AND m.to_user = ${user1})
+      LEFT JOIN users u1 ON m.from_user = u1.id
+      LEFT JOIN users u2 ON m.to_user = u2.id
+      WHERE (m.from_user = ${id1} AND m.to_user = ${id2})
+         OR (m.from_user = ${id2} AND m.to_user = ${id1})
       ORDER BY m.timestamp ASC
     `;
+    
+    console.log(`✅ Найдено ${rows.length} сообщений`);
     res.json(rows);
   } catch (error) {
     console.error('❌ Messages error:', error);
-    res.status(500).json({ error: '❌ Ошибка загрузки' });
+    res.status(500).json({ 
+      error: '❌ Ошибка загрузки сообщений: ' + error.message 
+    });
   }
 });
 
 // ========== СПИСОК ЧАТОВ ==========
 app.get('/api/chats/:userId', async (req, res) => {
   if (!pool) {
-    return res.status(500).json({ error: '❌ База данных не подключена' });
+    return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   const { userId } = req.params;
+  const id = parseInt(userId);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: '❌ Неверный ID пользователя' });
+  }
 
   try {
     const { rows } = await pool.sql`
       SELECT DISTINCT 
         CASE 
-          WHEN m.from_user = ${userId} THEN m.to_user
+          WHEN m.from_user = ${id} THEN m.to_user
           ELSE m.from_user
         END as contact_id,
         u.name,
         u.nickname,
         (SELECT content FROM messages m2 
-         WHERE (m2.from_user = ${userId} AND m2.to_user = u.id)
-            OR (m2.from_user = u.id AND m2.to_user = ${userId})
+         WHERE (m2.from_user = ${id} AND m2.to_user = u.id)
+            OR (m2.from_user = u.id AND m2.to_user = ${id})
          ORDER BY m2.timestamp DESC LIMIT 1) as last_message,
         (SELECT timestamp FROM messages m2 
-         WHERE (m2.from_user = ${userId} AND m2.to_user = u.id)
-            OR (m2.from_user = u.id AND m2.to_user = ${userId})
+         WHERE (m2.from_user = ${id} AND m2.to_user = u.id)
+            OR (m2.from_user = u.id AND m2.to_user = ${id})
          ORDER BY m2.timestamp DESC LIMIT 1) as last_message_time
       FROM messages m
       JOIN users u ON (u.id = m.from_user OR u.id = m.to_user)
-      WHERE (m.from_user = ${userId} OR m.to_user = ${userId})
-        AND u.id != ${userId}
+      WHERE (m.from_user = ${id} OR m.to_user = ${id})
+        AND u.id != ${id}
       ORDER BY last_message_time DESC
     `;
     res.json(rows);
@@ -315,14 +316,12 @@ app.get('/api/chats/:userId', async (req, res) => {
   }
 });
 
-// ========== ОБРАБОТКА 404 ==========
+// ========== 404 ==========
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: '❌ Маршрут не найден',
-    path: req.path,
-    method: req.method
+    path: req.path
   });
 });
 
-// ========== ВАЖНО: экспорт для Vercel ==========
 export default app;
