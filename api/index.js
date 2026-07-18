@@ -8,7 +8,6 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== НАСТРОЙКА MULTER ==========
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
