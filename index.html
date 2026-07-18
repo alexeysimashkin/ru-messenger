@@ -880,6 +880,53 @@
     let mediaRecorder = null;
     let audioChunks = [];
     let currentTab = 'chats';
+    let eventSource = null;
+
+    // ========== SSE (LIVE-ОБНОВЛЕНИЯ) ==========
+    function connectSSE() {
+      if (eventSource) {
+        eventSource.close();
+      }
+
+      console.log('🔄 Подключение к SSE...');
+      
+      eventSource = new EventSource(API + '/events');
+      
+      eventSource.onopen = () => {
+        console.log('✅ SSE подключен');
+      };
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📨 Получено событие:', data);
+          
+          if (data.type === 'new_message') {
+            if (selectedUser && data.from_user === selectedUser.id) {
+              loadMessages(selectedUser.id);
+            }
+            loadChats();
+          } else if (data.type === 'channel_message') {
+            if (selectedChannel && data.channel_id === selectedChannel.id) {
+              loadChannelMessages(selectedChannel.id);
+            }
+            loadChannels();
+          }
+        } catch (error) {
+          console.error('❌ Ошибка обработки SSE:', error);
+        }
+      };
+      
+      eventSource.onerror = (error) => {
+        console.error('❌ SSE ошибка:', error);
+        eventSource.close();
+        setTimeout(() => {
+          if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
+            connectSSE();
+          }
+        }, 5000);
+      };
+    }
 
     function formatTime(date) {
       return new Date(date).toLocaleTimeString('ru-RU', { 
@@ -988,6 +1035,41 @@
         currentUser = data.user;
         localStorage.setItem('token', token);
         renderApp();
+        connectSSE();
+        
+        // ===== ОБРАБОТКА ПАРАМЕТРА open_channel =====
+        setTimeout(() => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const channelId = urlParams.get('open_channel');
+          if (channelId) {
+            console.log('📢 Открываем канал по ID:', channelId);
+            switchTab('channels');
+            setTimeout(async () => {
+              await loadChannels();
+              const channel = channels.find(c => c.id === Number(channelId));
+              if (channel) {
+                selectChannel(channel);
+              } else {
+                try {
+                  await request('/channel/join', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      channel_id: Number(channelId),
+                      user_id: currentUser.id
+                    })
+                  });
+                  await loadChannels();
+                  const newChannel = channels.find(c => c.id === Number(channelId));
+                  if (newChannel) selectChannel(newChannel);
+                } catch (e) {
+                  console.log('❌ Не удалось присоединиться:', e.message);
+                }
+              }
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }, 1500);
+          }
+        }, 500);
+        
       } catch (error) { showError(error.message); }
       finally { isLoading = false; btn.textContent = originalText; btn.disabled = false; }
     }
@@ -998,6 +1080,10 @@
       currentUser = null;
       selectedUser = null;
       selectedChannel = null;
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
       renderAuth();
     }
 
@@ -1703,6 +1789,39 @@
           const user = await request('/me');
           currentUser = user;
           renderApp();
+          connectSSE();
+          
+          // ===== ОБРАБОТКА ПАРАМЕТРА open_channel =====
+          const urlParams = new URLSearchParams(window.location.search);
+          const channelId = urlParams.get('open_channel');
+          if (channelId) {
+            console.log('📢 Открываем канал по ID:', channelId);
+            setTimeout(async () => {
+              switchTab('channels');
+              await loadChannels();
+              const channel = channels.find(c => c.id === Number(channelId));
+              if (channel) {
+                selectChannel(channel);
+              } else {
+                try {
+                  await request('/channel/join', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      channel_id: Number(channelId),
+                      user_id: currentUser.id
+                    })
+                  });
+                  await loadChannels();
+                  const newChannel = channels.find(c => c.id === Number(channelId));
+                  if (newChannel) selectChannel(newChannel);
+                } catch (e) {
+                  console.log('❌ Не удалось присоединиться:', e.message);
+                }
+              }
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }, 1500);
+          }
+          
         } catch (error) {
           localStorage.removeItem('token');
           token = null;
