@@ -1,43 +1,11 @@
-// ========== ПРИНУДИТЕЛЬНАЯ МИГРАЦИЯ ПРИ ЗАПУСКЕ ==========
-(async function migrate() {
-  if (!process.env.POSTGRES_URL) return;
-  
-  try {
-    const { createPool } = await import('@vercel/postgres');
-    const pool = createPool({ connectionString: process.env.POSTGRES_URL });
-    
-    await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`;
-    await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`;
-    await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE`;
-    
-    console.log('✅ Миграция выполнена!');
-  } catch (e) {
-    console.log('⚠️ Миграция:', e.message);
-  }
-})();
-
 import express from 'express';
 import { createPool } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import multer from 'multer';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Только изображения'), false);
-    }
-  }
-});
 
 let pool = null;
 
@@ -275,31 +243,27 @@ app.post('/api/message', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА ФОТО ==========
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+// ========== ОТПРАВКА ФОТО (ЧЕРЕЗ JSON, БЕЗ MULTER) ==========
+app.post('/api/upload', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
 
-  const { from_user, to_user } = req.body;
-  const file = req.file;
+  const { from_user, to_user, file_data, file_name, file_type } = req.body;
 
-  if (!from_user || !to_user || !file) {
+  if (!from_user || !to_user || !file_data) {
     return res.status(400).json({ error: '❌ Все поля обязательны' });
   }
 
   try {
-    const base64 = file.buffer.toString('base64');
-    const file_url = `data:${file.mimetype};base64,${base64}`;
-
     await pool.sql`
       INSERT INTO messages (from_user, to_user, file_url, file_type)
-      VALUES (${from_user}, ${to_user}, ${file_url}, ${file.mimetype})
+      VALUES (${from_user}, ${to_user}, ${file_data}, ${file_type || 'image/jpeg'})
     `;
-    res.json({ success: true, file_url });
+    res.json({ success: true });
   } catch (error) {
     console.error('❌ Upload error:', error);
-    res.status(500).json({ error: '❌ Ошибка загрузки фото' });
+    res.status(500).json({ error: '❌ Ошибка загрузки фото: ' + error.message });
   }
 });
 
