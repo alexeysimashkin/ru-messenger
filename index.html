@@ -1051,7 +1051,7 @@
                 selectChannel(channel);
               } else {
                 try {
-                  await request('/channel/join', {
+                  await request('/channel/subscribe', {
                     method: 'POST',
                     body: JSON.stringify({
                       channel_id: Number(channelId),
@@ -1062,7 +1062,8 @@
                   const newChannel = channels.find(c => c.id === Number(channelId));
                   if (newChannel) selectChannel(newChannel);
                 } catch (e) {
-                  console.log('❌ Не удалось присоединиться:', e.message);
+                  console.log('❌ Не удалось подписаться:', e.message);
+                  showError(e.message);
                 }
               }
               window.history.replaceState({}, document.title, window.location.pathname);
@@ -1151,7 +1152,7 @@
       } catch (error) { showError(error.message); }
     }
 
-    // ===== КАНАЛЫ =====
+    // ===== КАНАЛЫ (ОБНОВЛЁННЫЕ) =====
     async function loadChannels() {
       try {
         const data = await request(`/channels/${currentUser.id}`);
@@ -1170,6 +1171,30 @@
       }
     }
 
+    async function checkChannelAdmin(channelId) {
+      try {
+        const data = await request(`/channel/check/${channelId}/${currentUser.id}`);
+        const isAdmin = data.isAdmin;
+        
+        const inputContainer = document.getElementById('channelInputContainer');
+        if (inputContainer) {
+          if (isAdmin) {
+            inputContainer.style.display = 'flex';
+          } else {
+            inputContainer.style.display = 'none';
+          }
+        }
+        
+        // Также показываем/скрываем кнопку для голосовых в канале
+        const voiceBtn = document.getElementById('channelVoiceBtn');
+        if (voiceBtn) {
+          voiceBtn.style.display = isAdmin ? 'inline-block' : 'none';
+        }
+      } catch (error) {
+        console.log('❌ Ошибка проверки прав:', error);
+      }
+    }
+
     async function sendChannelMessage() {
       const content = document.getElementById('channelMessageInput').value.trim();
       if (!content || !selectedChannel) return;
@@ -1185,7 +1210,9 @@
         });
         document.getElementById('channelMessageInput').value = '';
         await loadChannelMessages(selectedChannel.id);
-      } catch (error) { showError(error.message); }
+      } catch (error) {
+        showError(error.message);
+      }
     }
 
     function selectChannel(channel) {
@@ -1195,6 +1222,10 @@
       document.getElementById('channelListView').style.display = 'none';
       document.getElementById('selectedChannelName').textContent = channel.name;
       document.getElementById('selectedChannelSub').textContent = channel.nickname ? '@' + channel.nickname : 'Приватный канал';
+      
+      // Проверяем, является ли пользователь создателем
+      checkChannelAdmin(channel.id);
+      
       loadChannelMessages(channel.id);
     }
 
@@ -1311,7 +1342,7 @@
       if (!container) return;
 
       if (channelMessages.length === 0) {
-        container.innerHTML = `<div class="empty"><span class="icon">💬</span>Начните общение в канале</div>`;
+        container.innerHTML = `<div class="empty"><span class="icon">📢</span>В этом канале пока нет сообщений</div>`;
         return;
       }
 
@@ -1337,7 +1368,7 @@
 
         return `
           <div class="message ${isMy ? 'my' : 'other'}">
-            ${!isMy ? `<div class="sender">${m.from_name || 'Пользователь'}</div>` : ''}
+            ${!isMy ? `<div class="sender">${m.from_name || 'Администратор'}</div>` : ''}
             ${contentHtml}
             <div class="time">${formatTime(m.timestamp)}</div>
           </div>
@@ -1541,6 +1572,18 @@
                 showError('❌ Ошибка отправки голосового: ' + error.message);
               }
             } else if (selectedChannel) {
+              // Проверяем, является ли пользователь админом
+              try {
+                const check = await request(`/channel/check/${selectedChannel.id}/${currentUser.id}`);
+                if (!check.isAdmin) {
+                  showError('❌ Только администратор может отправлять голосовые в канал');
+                  return;
+                }
+              } catch (e) {
+                showError('❌ Ошибка проверки прав');
+                return;
+              }
+              
               try {
                 await request('/channel/message', {
                   method: 'POST',
@@ -1724,7 +1767,7 @@
               
               <div class="messages-container" id="channelMessagesList"></div>
               
-              <div class="input-container">
+              <div class="input-container" id="channelInputContainer" style="display:none;">
                 <input id="channelMessageInput" placeholder="Сообщение в канал..." />
                 <button onclick="sendChannelMessage()">Отправить</button>
                 <button class="icon-btn" id="channelVoiceBtn" onclick="toggleVoiceRecord()" title="Голосовое">🎤</button>
@@ -1804,7 +1847,7 @@
                 selectChannel(channel);
               } else {
                 try {
-                  await request('/channel/join', {
+                  await request('/channel/subscribe', {
                     method: 'POST',
                     body: JSON.stringify({
                       channel_id: Number(channelId),
@@ -1815,7 +1858,8 @@
                   const newChannel = channels.find(c => c.id === Number(channelId));
                   if (newChannel) selectChannel(newChannel);
                 } catch (e) {
-                  console.log('❌ Не удалось присоединиться:', e.message);
+                  console.log('❌ Не удалось подписаться:', e.message);
+                  showError(e.message);
                 }
               }
               window.history.replaceState({}, document.title, window.location.pathname);
