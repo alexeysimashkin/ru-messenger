@@ -2,9 +2,26 @@ import express from 'express';
 import { createPool } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ========== НАСТРОЙКА MULTER ДЛЯ ФАЙЛОВ ==========
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Только изображения'), false);
+    }
+  }
+});
 
 let pool = null;
 
@@ -19,16 +36,7 @@ try {
   console.error('❌ Ошибка подключения к БД:', err.message);
 }
 
-// ========== HEALTH CHECK ==========
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    postgres: !!pool
-  });
-});
-
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
+// ========== ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ ==========
 app.post('/api/init', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -50,7 +58,10 @@ app.post('/api/init', async (req, res) => {
         id SERIAL PRIMARY KEY,
         from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
         to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        content TEXT NOT NULL,
+        content TEXT,
+        file_url TEXT,
+        file_type TEXT,
+        is_voice BOOLEAN DEFAULT FALSE,
         timestamp TIMESTAMP DEFAULT NOW()
       )
     `;
@@ -200,22 +211,22 @@ app.get('/api/search/:nickname', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА СООБЩЕНИЯ ==========
+// ========== ОТПРАВКА СООБЩЕНИЯ (ТЕКСТ) ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
 
-  const { from_user, to_user, content } = req.body;
+  const { from_user, to_user, content, file_url, file_type, is_voice } = req.body;
 
-  if (!from_user || !to_user || !content) {
-    return res.status(400).json({ error: '❌ Все поля обязательны' });
+  if (!from_user || !to_user) {
+    return res.status(400).json({ error: '❌ Отправитель и получатель обязательны' });
   }
 
   try {
     await pool.sql`
-      INSERT INTO messages (from_user, to_user, content)
-      VALUES (${from_user}, ${to_user}, ${content})
+      INSERT INTO messages (from_user, to_user, content, file_url, file_type, is_voice)
+      VALUES (${from_user}, ${to_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
     `;
     res.json({ success: true });
   } catch (error) {
@@ -224,7 +235,36 @@ app.post('/api/message', async (req, res) => {
   }
 });
 
-// ========== ИСТОРИЯ СООБЩЕНИЙ (УПРОЩЁННАЯ) ==========
+// ========== ОТПРАВКА ФОТО ==========
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { from_user, to_user } = req.body;
+  const file = req.file;
+
+  if (!from_user || !to_user || !file) {
+    return res.status(400).json({ error: '❌ Все поля обязательны' });
+  }
+
+  try {
+    // Конвертируем фото в base64
+    const base64 = file.buffer.toString('base64');
+    const file_url = `data:${file.mimetype};base64,${base64}`;
+
+    await pool.sql`
+      INSERT INTO messages (from_user, to_user, file_url, file_type)
+      VALUES (${from_user}, ${to_user}, ${file_url}, ${file.mimetype})
+    `;
+    res.json({ success: true, file_url });
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    res.status(500).json({ error: '❌ Ошибка загрузки фото' });
+  }
+});
+
+// ========== ИСТОРИЯ СООБЩЕНИЙ ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
   console.log('📜 Запрос истории:', req.params);
   
@@ -234,17 +274,12 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
 
   const { user1, user2 } = req.params;
 
-  // Преобразуем в числа
   const id1 = Number(user1);
   const id2 = Number(user2);
 
-  console.log(`📊 ID1: ${id1} (${typeof id1}), ID2: ${id2} (${typeof id2})`);
-
   if (isNaN(id1) || isNaN(id2) || id1 <= 0 || id2 <= 0) {
-    console.error('❌ Неверные ID:', { user1, user2, id1, id2 });
     return res.status(400).json({ 
-      error: '❌ Неверные ID пользователей',
-      details: { user1, user2, id1, id2 }
+      error: '❌ Неверные ID пользователей'
     });
   }
 
@@ -255,6 +290,9 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
         m.from_user,
         m.to_user,
         m.content,
+        m.file_url,
+        m.file_type,
+        m.is_voice,
         m.timestamp,
         u1.name as from_name,
         u2.name as to_name
@@ -319,7 +357,6 @@ app.get('/api/chats/:userId', async (req, res) => {
   }
 });
 
-// ========== 404 ==========
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: '❌ Маршрут не найден',
