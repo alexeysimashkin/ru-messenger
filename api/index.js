@@ -34,56 +34,6 @@ try {
   console.error('❌ Ошибка подключения к БД:', err.message);
 }
 
-// ========== АВТОМАТИЧЕСКАЯ МИГРАЦИЯ ПРИ ЗАПУСКЕ ==========
-async function autoMigrate() {
-  if (!pool) {
-    console.log('⚠️ Пул не создан, миграция пропущена');
-    return;
-  }
-
-  try {
-    console.log('🔄 Проверка структуры таблицы messages...');
-    
-    // Проверяем существующие колонки
-    const { rows } = await pool.sql`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'messages'
-    `;
-    const columns = rows.map(r => r.column_name);
-    console.log('📊 Существующие колонки:', columns);
-    
-    const results = [];
-    
-    // Добавляем недостающие колонки
-    if (!columns.includes('file_url')) {
-      await pool.sql`ALTER TABLE messages ADD COLUMN file_url TEXT`;
-      results.push('✅ Добавлена колонка file_url');
-      console.log('✅ Добавлена колонка file_url');
-    }
-    
-    if (!columns.includes('file_type')) {
-      await pool.sql`ALTER TABLE messages ADD COLUMN file_type TEXT`;
-      results.push('✅ Добавлена колонка file_type');
-      console.log('✅ Добавлена колонка file_type');
-    }
-    
-    if (!columns.includes('is_voice')) {
-      await pool.sql`ALTER TABLE messages ADD COLUMN is_voice BOOLEAN DEFAULT FALSE`;
-      results.push('✅ Добавлена колонка is_voice');
-      console.log('✅ Добавлена колонка is_voice');
-    }
-    
-    if (results.length === 0) {
-      console.log('✅ Все колонки уже существуют');
-    } else {
-      console.log('✅ Миграция завершена:', results);
-    }
-  } catch (error) {
-    console.error('❌ Ошибка миграции:', error.message);
-  }
-}
-
 // ========== ПРОВЕРКА СТРУКТУРЫ ==========
 app.get('/api/check', async (req, res) => {
   if (!pool) {
@@ -104,6 +54,88 @@ app.get('/api/check', async (req, res) => {
       hasIsVoice: columns.includes('is_voice')
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ПОСЛЕДНЯЯ НАДЕЖДА - ПРЯМОЕ ДОБАВЛЕНИЕ КОЛОНОК ==========
+app.get('/api/add-columns', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    console.log('🔧 Запуск добавления колонок...');
+    
+    const queries = [
+      { name: 'file_url', sql: 'ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT' },
+      { name: 'file_type', sql: 'ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT' },
+      { name: 'is_voice', sql: 'ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE' }
+    ];
+
+    const results = [];
+    for (const q of queries) {
+      try {
+        await pool.sql(q.sql);
+        results.push({ column: q.name, status: '✅ добавлена' });
+        console.log(`✅ Добавлена колонка ${q.name}`);
+      } catch (err) {
+        results.push({ column: q.name, status: '❌ ошибка', error: err.message });
+        console.error(`❌ Ошибка при добавлении ${q.name}:`, err.message);
+      }
+    }
+
+    const { rows } = await pool.sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'messages'
+    `;
+    const columns = rows.map(r => r.column_name);
+
+    res.json({ 
+      success: true,
+      message: '✅ Таблица обновлена!',
+      added: results,
+      currentColumns: columns
+    });
+  } catch (error) {
+    console.error('❌ Ошибка:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
+app.post('/api/init', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        nickname TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT,
+        file_url TEXT,
+        file_type TEXT,
+        is_voice BOOLEAN DEFAULT FALSE,
+        timestamp TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    res.json({ success: true, message: '✅ Таблицы созданы' });
+  } catch (error) {
+    console.error('❌ Init error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -398,14 +430,6 @@ app.use('*', (req, res) => {
     error: '❌ Маршрут не найден',
     path: req.path
   });
-});
-
-// ========== ЗАПУСК МИГРАЦИИ ==========
-console.log('🚀 Запуск сервера...');
-autoMigrate().then(() => {
-  console.log('✅ Готово!');
-}).catch(err => {
-  console.error('❌ Ошибка при миграции:', err);
 });
 
 export default app;
