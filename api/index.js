@@ -92,15 +92,13 @@ app.post('/api/migrate', async (req, res) => {
   }
 });
 
-// ========== ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ТАБЛИЦ КАНАЛОВ (GET) ==========
+// ========== ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ТАБЛИЦ КАНАЛОВ ==========
 app.get('/api/create-channels', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   try {
-    console.log('🔧 Принудительное создание таблиц каналов...');
-    
     await pool.sql`
       CREATE TABLE IF NOT EXISTS channels (
         id SERIAL PRIMARY KEY,
@@ -133,8 +131,6 @@ app.get('/api/create-channels', async (req, res) => {
         timestamp TIMESTAMP DEFAULT NOW()
       )
     `;
-    
-    console.log('✅ Таблицы каналов созданы (GET)');
     res.json({ 
       success: true, 
       message: '✅ Таблицы каналов созданы!',
@@ -318,6 +314,147 @@ app.get('/api/search/:nickname', async (req, res) => {
   } catch (error) {
     console.error('❌ Search error:', error);
     res.status(500).json({ error: '❌ Ошибка поиска' });
+  }
+});
+
+// ========== ПОИСК КАНАЛОВ ==========
+app.get('/api/search/channels/:query', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { query } = req.params;
+  
+  if (!query || query.trim() === '') {
+    return res.json([]);
+  }
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT c.id, c.name, c.nickname, c.is_private, c.created_by, c.created_at,
+             u.name as creator_name
+      FROM channels c
+      JOIN users u ON c.created_by = u.id
+      WHERE (c.name ILIKE ${'%' + query + '%'} 
+        OR c.nickname ILIKE ${'%' + query + '%'})
+        AND c.is_private = false
+      LIMIT 20
+    `;
+    res.json(rows);
+  } catch (error) {
+    console.error('❌ Search channels error:', error);
+    res.status(500).json({ error: '❌ Ошибка поиска каналов' });
+  }
+});
+
+// ========== СТРАНИЦА КАНАЛА (ПО НИКНЕЙМУ) ==========
+app.get('/c/:nickname', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { nickname } = req.params;
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT c.*, u.name as creator_name, u.id as creator_id
+      FROM channels c
+      JOIN users u ON c.created_by = u.id
+      WHERE c.nickname = ${nickname} AND c.is_private = false
+    `;
+    
+    if (!rows[0]) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Канал не найден — RU</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; color: white; }
+            .container { background: #1a1a1a; border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; text-align: center; border: 1px solid #2a2a2a; }
+            .icon { font-size: 64px; margin-bottom: 16px; }
+            h1 { color: white; margin-bottom: 8px; }
+            .sub { color: #666; font-size: 14px; margin-bottom: 24px; }
+            .btn { display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all 0.3s; }
+            .btn:hover { transform: scale(1.02); box-shadow: 0 8px 30px rgba(108, 92, 231, 0.4); }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="icon">🔍</div>
+            <h1>Канал не найден</h1>
+            <div class="sub">Канала с таким никнеймом не существует или он приватный</div>
+            <a href="/" class="btn">Вернуться в мессенджер</a>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+    
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${rows[0].name} — RU Канал</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; color: white; }
+          .container { background: #1a1a1a; border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; text-align: center; border: 1px solid #2a2a2a; }
+          .icon { font-size: 64px; margin-bottom: 16px; }
+          h1 { color: white; margin-bottom: 8px; }
+          .sub { color: #666; font-size: 14px; margin-bottom: 24px; }
+          .btn { display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all 0.3s; }
+          .btn:hover { transform: scale(1.02); box-shadow: 0 8px 30px rgba(108, 92, 231, 0.4); }
+          .creator { color: #555; font-size: 13px; margin-top: 16px; }
+          .private-badge { background: #2a2a2a; color: #888; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; margin-bottom: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="icon">📢</div>
+          <div class="private-badge">🌐 Публичный</div>
+          <h1>${rows[0].name}</h1>
+          <div class="sub">@${rows[0].nickname}</div>
+          <p style="color:#888; margin-bottom:24px;">Создатель: ${rows[0].creator_name}</p>
+          <a href="/" class="btn">Открыть в мессенджере</a>
+          <div class="creator">Канал создан в RU Мессенджере</div>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    console.error('❌ Channel page error:', error);
+    res.status(500).json({ error: '❌ Ошибка загрузки канала' });
+  }
+});
+
+// ========== API: ПОЛУЧИТЬ КАНАЛ ПО НИКНЕЙМУ ==========
+app.get('/api/channel/by-nickname/:nickname', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { nickname } = req.params;
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT c.*, u.name as creator_name
+      FROM channels c
+      JOIN users u ON c.created_by = u.id
+      WHERE c.nickname = ${nickname}
+    `;
+    
+    if (!rows[0]) {
+      return res.status(404).json({ error: '❌ Канал не найден' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('❌ Channel by nickname error:', error);
+    res.status(500).json({ error: '❌ Ошибка загрузки канала' });
   }
 });
 
