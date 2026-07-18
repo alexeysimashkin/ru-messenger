@@ -2,6 +2,7 @@ import express from 'express';
 import { createPool } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -66,6 +67,38 @@ app.post('/api/init', async (req, res) => {
         id SERIAL PRIMARY KEY,
         from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
         to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT,
+        file_url TEXT,
+        file_type TEXT,
+        is_voice BOOLEAN DEFAULT FALSE,
+        timestamp TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS channels (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        nickname TEXT UNIQUE,
+        is_private BOOLEAN DEFAULT FALSE,
+        invite_code TEXT UNIQUE,
+        created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS channel_members (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        joined_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(channel_id, user_id)
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS channel_messages (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
         content TEXT,
         file_url TEXT,
         file_type TEXT,
@@ -191,7 +224,7 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
-// ========== ПОИСК ==========
+// ========== ПОИСК ПОЛЬЗОВАТЕЛЕЙ ==========
 app.get('/api/search/:nickname', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -219,7 +252,185 @@ app.get('/api/search/:nickname', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА СООБЩЕНИЯ ==========
+// ========== СОЗДАНИЕ КАНАЛА ==========
+app.post('/api/channel/create', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { name, nickname, is_private, created_by } = req.body;
+
+  if (!name || !created_by) {
+    return res.status(400).json({ error: '❌ Название и создатель обязательны' });
+  }
+
+  try {
+    const inviteCode = is_private ? uuidv4().slice(0, 8) : null;
+    
+    const result = await pool.sql`
+      INSERT INTO channels (name, nickname, is_private, invite_code, created_by)
+      VALUES (${name}, ${nickname || null}, ${is_private || false}, ${inviteCode}, ${created_by})
+      RETURNING id, name, nickname, is_private, invite_code
+    `;
+
+    // Добавляем создателя как участника
+    await pool.sql`
+      INSERT INTO channel_members (channel_id, user_id)
+      VALUES (${result.rows[0].id}, ${created_by})
+    `;
+
+    res.json({ 
+      success: true, 
+      channel: result.rows[0],
+      link: is_private 
+        ? `/c/join/${result.rows[0].invite_code}` 
+        : `/c/${nickname}`
+    });
+  } catch (error) {
+    console.error('❌ Channel create error:', error);
+    res.status(500).json({ error: '❌ Ошибка создания канала' });
+  }
+});
+
+// ========== ПОЛУЧИТЬ КАНАЛ ПО НИКНЕЙМУ ==========
+app.get('/api/channel/:nickname', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { nickname } = req.params;
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT c.*, u.name as creator_name
+      FROM channels c
+      JOIN users u ON c.created_by = u.id
+      WHERE c.nickname = ${nickname}
+    `;
+    
+    if (!rows[0]) {
+      return res.status(404).json({ error: '❌ Канал не найден' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('❌ Channel get error:', error);
+    res.status(500).json({ error: '❌ Ошибка загрузки канала' });
+  }
+});
+
+// ========== ПРИСОЕДИНИТЬСЯ К КАНАЛУ ==========
+app.post('/api/channel/join', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { channel_id, user_id, invite_code } = req.body;
+
+  if (!channel_id || !user_id) {
+    return res.status(400).json({ error: '❌ Канал и пользователь обязательны' });
+  }
+
+  try {
+    // Проверяем, что канал существует и доступен
+    const { rows } = await pool.sql`
+      SELECT id, is_private, invite_code FROM channels WHERE id = ${channel_id}
+    `;
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: '❌ Канал не найден' });
+    }
+
+    if (rows[0].is_private && rows[0].invite_code !== invite_code) {
+      return res.status(403).json({ error: '❌ Неверный код приглашения' });
+    }
+
+    // Добавляем участника
+    await pool.sql`
+      INSERT INTO channel_members (channel_id, user_id)
+      VALUES (${channel_id}, ${user_id})
+    `;
+
+    res.json({ success: true, message: '✅ Вы присоединились к каналу' });
+  } catch (error) {
+    console.error('❌ Channel join error:', error);
+    res.status(500).json({ error: '❌ Ошибка присоединения' });
+  }
+});
+
+// ========== ПОЛУЧИТЬ КАНАЛЫ ПОЛЬЗОВАТЕЛЯ ==========
+app.get('/api/channels/:userId', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { userId } = req.params;
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT c.id, c.name, c.nickname, c.is_private, c.created_by, c.created_at,
+             u.name as creator_name
+      FROM channels c
+      JOIN channel_members cm ON c.id = cm.channel_id
+      JOIN users u ON c.created_by = u.id
+      WHERE cm.user_id = ${userId}
+      ORDER BY c.created_at DESC
+    `;
+    res.json(rows);
+  } catch (error) {
+    console.error('❌ Channels list error:', error);
+    res.status(500).json({ error: '❌ Ошибка загрузки каналов' });
+  }
+});
+
+// ========== ОТПРАВКА СООБЩЕНИЯ В КАНАЛ ==========
+app.post('/api/channel/message', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { channel_id, from_user, content, file_url, file_type, is_voice } = req.body;
+
+  if (!channel_id || !from_user) {
+    return res.status(400).json({ error: '❌ Канал и отправитель обязательны' });
+  }
+
+  try {
+    await pool.sql`
+      INSERT INTO channel_messages (channel_id, from_user, content, file_url, file_type, is_voice)
+      VALUES (${channel_id}, ${from_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
+    `;
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Channel message error:', error);
+    res.status(500).json({ error: '❌ Ошибка отправки' });
+  }
+});
+
+// ========== ПОЛУЧИТЬ СООБЩЕНИЯ КАНАЛА ==========
+app.get('/api/channel/messages/:channelId', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { channelId } = req.params;
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT cm.*, u.name as from_name, u.nickname as from_nickname
+      FROM channel_messages cm
+      JOIN users u ON cm.from_user = u.id
+      WHERE cm.channel_id = ${channelId}
+      ORDER BY cm.timestamp ASC
+    `;
+    res.json(rows);
+  } catch (error) {
+    console.error('❌ Channel messages error:', error);
+    res.status(500).json({ error: '❌ Ошибка загрузки сообщений' });
+  }
+});
+
+// ========== ОТПРАВКА ЛИЧНОГО СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -243,7 +454,7 @@ app.post('/api/message', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА ФОТО (ИСПРАВЛЕННАЯ) ==========
+// ========== ОТПРАВКА ФОТО ==========
 app.post('/api/upload', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -256,7 +467,6 @@ app.post('/api/upload', async (req, res) => {
   }
 
   try {
-    // Добавляем текст в content, чтобы не было NULL
     await pool.sql`
       INSERT INTO messages (from_user, to_user, content, file_url, file_type)
       VALUES (${from_user}, ${to_user}, '📷 Фото', ${file_data}, ${file_type || 'image/jpeg'})
@@ -268,7 +478,7 @@ app.post('/api/upload', async (req, res) => {
   }
 });
 
-// ========== ИСТОРИЯ ==========
+// ========== ИСТОРИЯ ЛИЧНЫХ СООБЩЕНИЙ ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
   console.log('📜 Запрос истории:', req.params);
   
@@ -318,7 +528,7 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
   }
 });
 
-// ========== СПИСОК ЧАТОВ ==========
+// ========== СПИСОК ЛИЧНЫХ ЧАТОВ ==========
 app.get('/api/chats/:userId', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
