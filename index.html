@@ -789,7 +789,7 @@
       }
     }
 
-    // ========== ФОТО (ОБНОВЛЁННЫЙ) ==========
+    // ========== ФОТО (ИСПРАВЛЕННЫЙ) ==========
     function triggerFileUpload() {
       document.getElementById('fileInput').click();
       document.getElementById('attachMenu').style.display = 'none';
@@ -814,6 +814,8 @@
         return;
       }
 
+      showError('⏳ Загрузка фото...', true);
+
       try {
         const reader = new FileReader();
         reader.onloadend = async function() {
@@ -833,6 +835,7 @@
             
             if (data.success) {
               await loadMessages(selectedUser.id);
+              showError('✅ Фото отправлено!', true);
             } else {
               showError('❌ Ошибка загрузки фото: ' + (data.error || 'Неизвестная ошибка'));
             }
