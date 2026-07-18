@@ -9,6 +9,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 let pool = null;
+let clients = [];
 
 try {
   if (process.env.POSTGRES_URL) {
@@ -45,7 +46,7 @@ app.get('/api/check', async (req, res) => {
   }
 });
 
-// ========== МИГРАЦИЯ (ДОБАВЛЕНИЕ ТАБЛИЦ КАНАЛОВ) ==========
+// ========== МИГРАЦИЯ ==========
 app.post('/api/migrate', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -268,6 +269,8 @@ app.get('/api/search/:nickname', async (req, res) => {
 
 // ========== СОЗДАНИЕ КАНАЛА ==========
 app.post('/api/channel/create', async (req, res) => {
+  console.log('📢 Создание канала:', req.body);
+  
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
@@ -292,6 +295,8 @@ app.post('/api/channel/create', async (req, res) => {
       VALUES (${result.rows[0].id}, ${created_by})
     `;
 
+    console.log('✅ Канал создан:', result.rows[0]);
+
     res.json({ 
       success: true, 
       channel: result.rows[0],
@@ -304,7 +309,7 @@ app.post('/api/channel/create', async (req, res) => {
     if (error.message?.includes('duplicate key')) {
       res.status(400).json({ error: '❌ Такой никнейм канала уже занят' });
     } else {
-      res.status(500).json({ error: '❌ Ошибка создания канала' });
+      res.status(500).json({ error: '❌ Ошибка создания канала: ' + error.message });
     }
   }
 });
@@ -379,6 +384,8 @@ app.post('/api/channel/join', async (req, res) => {
 
 // ========== ПОЛУЧИТЬ КАНАЛЫ ПОЛЬЗОВАТЕЛЯ ==========
 app.get('/api/channels/:userId', async (req, res) => {
+  console.log('📋 Запрос каналов для пользователя:', req.params.userId);
+  
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
@@ -395,15 +402,19 @@ app.get('/api/channels/:userId', async (req, res) => {
       WHERE cm.user_id = ${userId}
       ORDER BY c.created_at DESC
     `;
+    
+    console.log(`✅ Найдено ${rows.length} каналов`);
     res.json(rows);
   } catch (error) {
     console.error('❌ Channels list error:', error);
-    res.status(500).json({ error: '❌ Ошибка загрузки каналов' });
+    res.status(500).json({ error: '❌ Ошибка загрузки каналов: ' + error.message });
   }
 });
 
 // ========== ОТПРАВКА СООБЩЕНИЯ В КАНАЛ ==========
 app.post('/api/channel/message', async (req, res) => {
+  console.log('💬 Сообщение в канал:', req.body);
+  
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
@@ -419,6 +430,10 @@ app.post('/api/channel/message', async (req, res) => {
       INSERT INTO channel_messages (channel_id, from_user, content, file_url, file_type, is_voice)
       VALUES (${channel_id}, ${from_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
     `;
+    
+    // Отправляем уведомление всем клиентам
+    notifyClients({ type: 'channel_message', channel_id });
+    
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Channel message error:', error);
@@ -428,6 +443,8 @@ app.post('/api/channel/message', async (req, res) => {
 
 // ========== ПОЛУЧИТЬ СООБЩЕНИЯ КАНАЛА ==========
 app.get('/api/channel/messages/:channelId', async (req, res) => {
+  console.log('📜 Запрос сообщений канала:', req.params.channelId);
+  
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
@@ -442,6 +459,8 @@ app.get('/api/channel/messages/:channelId', async (req, res) => {
       WHERE cm.channel_id = ${channelId}
       ORDER BY cm.timestamp ASC
     `;
+    
+    console.log(`✅ Найдено ${rows.length} сообщений`);
     res.json(rows);
   } catch (error) {
     console.error('❌ Channel messages error:', error);
@@ -451,6 +470,8 @@ app.get('/api/channel/messages/:channelId', async (req, res) => {
 
 // ========== ОТПРАВКА ЛИЧНОГО СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
+  console.log('💬 Личное сообщение:', req.body);
+  
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
@@ -466,6 +487,10 @@ app.post('/api/message', async (req, res) => {
       INSERT INTO messages (from_user, to_user, content, file_url, file_type, is_voice)
       VALUES (${from_user}, ${to_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
     `;
+    
+    // Отправляем уведомление получателю
+    notifyClients({ type: 'new_message', to_user, from_user });
+    
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Message error:', error);
@@ -490,6 +515,9 @@ app.post('/api/upload', async (req, res) => {
       INSERT INTO messages (from_user, to_user, content, file_url, file_type)
       VALUES (${from_user}, ${to_user}, '📷 Фото', ${file_data}, ${file_type || 'image/jpeg'})
     `;
+    
+    notifyClients({ type: 'new_message', to_user, from_user });
+    
     res.json({ success: true });
   } catch (error) {
     console.error('❌ Upload error:', error);
@@ -589,6 +617,47 @@ app.get('/api/chats/:userId', async (req, res) => {
     res.status(500).json({ error: '❌ Ошибка загрузки чатов' });
   }
 });
+
+// ========== SERVER-SENT EVENTS (SSE) ДЛЯ LIVE-ОБНОВЛЕНИЙ ==========
+app.get('/api/events', (req, res) => {
+  console.log('🔌 Клиент подключился к SSE');
+  
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  const clientId = Date.now();
+  const newClient = {
+    id: clientId,
+    res
+  };
+
+  clients.push(newClient);
+  console.log(`✅ Клиент ${clientId} подключен. Всего клиентов: ${clients.length}`);
+
+  // Отправляем приветственное сообщение
+  res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
+
+  req.on('close', () => {
+    console.log(`❌ Клиент ${clientId} отключен`);
+    clients = clients.filter(client => client.id !== clientId);
+    console.log(`📊 Осталось клиентов: ${clients.length}`);
+  });
+});
+
+// Функция уведомления всех клиентов
+function notifyClients(data) {
+  console.log(`📤 Отправка уведомления ${clients.length} клиентам:`, data);
+  
+  clients.forEach(client => {
+    try {
+      client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch (error) {
+      console.error('❌ Ошибка отправки клиенту:', error);
+    }
+  });
+}
 
 // ========== 404 ==========
 app.use('*', (req, res) => {
