@@ -243,7 +243,7 @@ app.post('/api/message', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА ФОТО (ЧЕРЕЗ JSON, БЕЗ MULTER) ==========
+// ========== ОТПРАВКА ФОТО (ИСПРАВЛЕННАЯ) ==========
 app.post('/api/upload', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -256,9 +256,10 @@ app.post('/api/upload', async (req, res) => {
   }
 
   try {
+    // Добавляем текст в content, чтобы не было NULL
     await pool.sql`
-      INSERT INTO messages (from_user, to_user, file_url, file_type)
-      VALUES (${from_user}, ${to_user}, ${file_data}, ${file_type || 'image/jpeg'})
+      INSERT INTO messages (from_user, to_user, content, file_url, file_type)
+      VALUES (${from_user}, ${to_user}, '📷 Фото', ${file_data}, ${file_type || 'image/jpeg'})
     `;
     res.json({ success: true });
   } catch (error) {
