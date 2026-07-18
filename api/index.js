@@ -8,11 +8,11 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== НАСТРОЙКА MULTER ДЛЯ ФАЙЛОВ ==========
+// ========== НАСТРОЙКА MULTER ==========
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -35,7 +35,7 @@ try {
   console.error('❌ Ошибка подключения к БД:', err.message);
 }
 
-// ========== ПРОВЕРКА СТРУКТУРЫ БАЗЫ ==========
+// ========== ПРОВЕРКА СТРУКТУРЫ ==========
 app.get('/api/check', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -59,31 +59,52 @@ app.get('/api/check', async (req, res) => {
   }
 });
 
-// ========== БЫСТРОЕ ИСПРАВЛЕНИЕ (ДОБАВЛЕНИЕ КОЛОНОК) ==========
-app.post('/api/fix', async (req, res) => {
+// ========== ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ==========
+app.post('/api/force-update', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   try {
-    const queries = [
-      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`,
-      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`,
-      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE`
-    ];
-
+    const { rows } = await pool.sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'messages'
+    `;
+    const columns = rows.map(r => r.column_name);
+    
     const results = [];
-    for (const sql of queries) {
-      try {
-        await pool.sql(sql);
-        results.push({ sql, success: true });
-      } catch (e) {
-        results.push({ sql, success: false, error: e.message });
-      }
+    
+    if (!columns.includes('file_url')) {
+      await pool.sql`ALTER TABLE messages ADD COLUMN file_url TEXT`;
+      results.push('✅ Добавлена колонка file_url');
+    }
+    
+    if (!columns.includes('file_type')) {
+      await pool.sql`ALTER TABLE messages ADD COLUMN file_type TEXT`;
+      results.push('✅ Добавлена колонка file_type');
+    }
+    
+    if (!columns.includes('is_voice')) {
+      await pool.sql`ALTER TABLE messages ADD COLUMN is_voice BOOLEAN DEFAULT FALSE`;
+      results.push('✅ Добавлена колонка is_voice');
     }
 
-    res.json({ success: true, results });
+    const { rows: finalRows } = await pool.sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'messages'
+    `;
+    const finalColumns = finalRows.map(r => r.column_name);
+
+    res.json({ 
+      success: true,
+      message: '✅ Таблица обновлена!',
+      added: results,
+      columns: finalColumns
+    });
   } catch (error) {
+    console.error('❌ Force update error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -263,7 +284,7 @@ app.get('/api/search/:nickname', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА СООБЩЕНИЯ (ТЕКСТ) ==========
+// ========== ОТПРАВКА СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -315,7 +336,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// ========== ИСТОРИЯ СООБЩЕНИЙ ==========
+// ========== ИСТОРИЯ ==========
 app.get('/api/messages/:user1/:user2', async (req, res) => {
   console.log('📜 Запрос истории:', req.params);
   
