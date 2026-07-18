@@ -8,10 +8,11 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// ========== НАСТРОЙКА MULTER ДЛЯ ФАЙЛОВ ==========
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -33,6 +34,59 @@ try {
 } catch (err) {
   console.error('❌ Ошибка подключения к БД:', err.message);
 }
+
+// ========== ПРОВЕРКА СТРУКТУРЫ БАЗЫ ==========
+app.get('/api/check', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'messages'
+    `;
+    const columns = rows.map(r => r.column_name);
+    res.json({ 
+      columns,
+      hasFileUrl: columns.includes('file_url'),
+      hasFileType: columns.includes('file_type'),
+      hasIsVoice: columns.includes('is_voice')
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== БЫСТРОЕ ИСПРАВЛЕНИЕ (ДОБАВЛЕНИЕ КОЛОНОК) ==========
+app.post('/api/fix', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    const queries = [
+      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`,
+      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`,
+      `ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE`
+    ];
+
+    const results = [];
+    for (const sql of queries) {
+      try {
+        await pool.sql(sql);
+        results.push({ sql, success: true });
+      } catch (e) {
+        results.push({ sql, success: false, error: e.message });
+      }
+    }
+
+    res.json({ success: true, results });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 app.post('/api/init', async (req, res) => {
@@ -66,30 +120,6 @@ app.post('/api/init', async (req, res) => {
     res.json({ success: true, message: '✅ Таблицы созданы' });
   } catch (error) {
     console.error('❌ Init error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== МИГРАЦИЯ (ДОБАВЛЕНИЕ КОЛОНОК) ==========
-app.post('/api/migrate', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ error: '❌ База не подключена' });
-  }
-
-  try {
-    // Проверяем существование колонок
-    await pool.sql`
-      ALTER TABLE messages 
-      ADD COLUMN IF NOT EXISTS file_url TEXT,
-      ADD COLUMN IF NOT EXISTS file_type TEXT,
-      ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE
-    `;
-    res.json({ 
-      success: true, 
-      message: '✅ Колонки добавлены: file_url, file_type, is_voice' 
-    });
-  } catch (error) {
-    console.error('❌ Migrate error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -233,7 +263,7 @@ app.get('/api/search/:nickname', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА СООБЩЕНИЯ ==========
+// ========== ОТПРАВКА СООБЩЕНИЯ (ТЕКСТ) ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -378,6 +408,7 @@ app.get('/api/chats/:userId', async (req, res) => {
   }
 });
 
+// ========== 404 ==========
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: '❌ Маршрут не найден',
