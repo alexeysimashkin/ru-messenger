@@ -704,6 +704,7 @@
     async function loadChats() {
       try {
         const data = await request(`/chats/${currentUser.id}`);
+        console.log('📋 Получены чаты:', data);
         contacts = data;
         renderContacts();
       } catch (error) {
@@ -711,31 +712,7 @@
       }
     }
 
-    // ========== ОТРИСОВКА ==========
-    function selectUser(user) {
-      console.log('👤 Выбран пользователь:', user);
-      console.log('🆔 ID пользователя:', user.id);
-      
-      if (!user || !user.id) {
-        showError('❌ Ошибка: пользователь не имеет ID');
-        return;
-      }
-
-      selectedUser = user;
-      document.getElementById('chatView').style.display = 'block';
-      document.getElementById('contactsView').style.display = 'none';
-      document.getElementById('selectedUserName').textContent = user.name;
-      document.getElementById('selectedUserNickname').textContent = '@' + user.nickname;
-      loadMessages(user.id);
-    }
-
-    function goBack() {
-      selectedUser = null;
-      document.getElementById('chatView').style.display = 'none';
-      document.getElementById('contactsView').style.display = 'block';
-      loadChats();
-    }
-
+    // ========== ОТРИСОВКА КОНТАКТОВ (ИСПРАВЛЕННАЯ) ==========
     function renderContacts() {
       const container = document.getElementById('contactsList');
       
@@ -751,15 +728,48 @@
         return;
       }
 
-      container.innerHTML = contacts.map(c => `
-        <div class="contact" onclick="selectUser(${JSON.stringify(c).replace(/"/g, '&quot;')})">
-          <div>
-            <div class="name">${c.name}</div>
-            <div class="nickname">@${c.nickname}</div>
+      container.innerHTML = contacts.map(c => {
+        // ВАЖНО: у контакта может быть contact_id вместо id
+        const contactId = c.id || c.contact_id;
+        const name = c.name || 'Без имени';
+        const nickname = c.nickname || 'unknown';
+        const lastMessage = c.last_message || '';
+        
+        return `
+          <div class="contact" onclick="selectUser({id: ${contactId}, name: '${name}', nickname: '${nickname}'})">
+            <div>
+              <div class="name">${name}</div>
+              <div class="nickname">@${nickname}</div>
+            </div>
+            ${lastMessage ? `<span class="badge">${lastMessage.slice(0, 30)}${lastMessage.length > 30 ? '...' : ''}</span>` : ''}
           </div>
-          ${c.last_message ? `<span class="badge">${c.last_message.slice(0, 30)}${c.last_message.length > 30 ? '...' : ''}</span>` : ''}
-        </div>
-      `).join('');
+        `;
+      }).join('');
+    }
+
+    // ========== ВЫБОР ПОЛЬЗОВАТЕЛЯ (ИСПРАВЛЕННЫЙ) ==========
+    function selectUser(user) {
+      console.log('👤 Выбран пользователь:', user);
+      console.log('🆔 ID пользователя:', user.id);
+      
+      if (!user || !user.id) {
+        showError('❌ Ошибка: пользователь не имеет ID');
+        return;
+      }
+
+      selectedUser = user;
+      document.getElementById('chatView').style.display = 'block';
+      document.getElementById('contactsView').style.display = 'none';
+      document.getElementById('selectedUserName').textContent = user.name || 'Пользователь';
+      document.getElementById('selectedUserNickname').textContent = '@' + (user.nickname || 'unknown');
+      loadMessages(user.id);
+    }
+
+    function goBack() {
+      selectedUser = null;
+      document.getElementById('chatView').style.display = 'none';
+      document.getElementById('contactsView').style.display = 'block';
+      loadChats();
     }
 
     function renderMessages() {
