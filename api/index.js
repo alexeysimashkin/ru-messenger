@@ -3,17 +3,15 @@ import { createPool } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
-import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ========== НАСТРОЙКА MULTER ДЛЯ ФАЙЛОВ ==========
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -36,7 +34,7 @@ try {
   console.error('❌ Ошибка подключения к БД:', err.message);
 }
 
-// ========== ИНИЦИАЛИЗАЦИЯ ТАБЛИЦ ==========
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
 app.post('/api/init', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -68,6 +66,30 @@ app.post('/api/init', async (req, res) => {
     res.json({ success: true, message: '✅ Таблицы созданы' });
   } catch (error) {
     console.error('❌ Init error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== МИГРАЦИЯ (ДОБАВЛЕНИЕ КОЛОНОК) ==========
+app.post('/api/migrate', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    // Проверяем существование колонок
+    await pool.sql`
+      ALTER TABLE messages 
+      ADD COLUMN IF NOT EXISTS file_url TEXT,
+      ADD COLUMN IF NOT EXISTS file_type TEXT,
+      ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE
+    `;
+    res.json({ 
+      success: true, 
+      message: '✅ Колонки добавлены: file_url, file_type, is_voice' 
+    });
+  } catch (error) {
+    console.error('❌ Migrate error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -211,7 +233,7 @@ app.get('/api/search/:nickname', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА СООБЩЕНИЯ (ТЕКСТ) ==========
+// ========== ОТПРАВКА СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -249,7 +271,6 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 
   try {
-    // Конвертируем фото в base64
     const base64 = file.buffer.toString('base64');
     const file_url = `data:${file.mimetype};base64,${base64}`;
 
