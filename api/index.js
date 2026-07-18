@@ -45,35 +45,13 @@ app.get('/api/check', async (req, res) => {
   }
 });
 
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
-app.post('/api/init', async (req, res) => {
+// ========== МИГРАЦИЯ (ДОБАВЛЕНИЕ ТАБЛИЦ КАНАЛОВ) ==========
+app.post('/api/migrate', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
 
   try {
-    await pool.sql`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        nickname TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `;
-    await pool.sql`
-      CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        content TEXT,
-        file_url TEXT,
-        file_type TEXT,
-        is_voice BOOLEAN DEFAULT FALSE,
-        timestamp TIMESTAMP DEFAULT NOW()
-      )
-    `;
     await pool.sql`
       CREATE TABLE IF NOT EXISTS channels (
         id SERIAL PRIMARY KEY,
@@ -99,6 +77,42 @@ app.post('/api/init', async (req, res) => {
         id SERIAL PRIMARY KEY,
         channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
         from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT,
+        file_url TEXT,
+        file_type TEXT,
+        is_voice BOOLEAN DEFAULT FALSE,
+        timestamp TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    res.json({ success: true, message: '✅ Таблицы каналов созданы' });
+  } catch (error) {
+    console.error('❌ Migrate error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ========== ИНИЦИАЛИЗАЦИЯ ==========
+app.post('/api/init', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        nickname TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
         content TEXT,
         file_url TEXT,
         file_type TEXT,
@@ -273,7 +287,6 @@ app.post('/api/channel/create', async (req, res) => {
       RETURNING id, name, nickname, is_private, invite_code
     `;
 
-    // Добавляем создателя как участника
     await pool.sql`
       INSERT INTO channel_members (channel_id, user_id)
       VALUES (${result.rows[0].id}, ${created_by})
@@ -288,7 +301,11 @@ app.post('/api/channel/create', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Channel create error:', error);
-    res.status(500).json({ error: '❌ Ошибка создания канала' });
+    if (error.message?.includes('duplicate key')) {
+      res.status(400).json({ error: '❌ Такой никнейм канала уже занят' });
+    } else {
+      res.status(500).json({ error: '❌ Ошибка создания канала' });
+    }
   }
 });
 
@@ -332,7 +349,6 @@ app.post('/api/channel/join', async (req, res) => {
   }
 
   try {
-    // Проверяем, что канал существует и доступен
     const { rows } = await pool.sql`
       SELECT id, is_private, invite_code FROM channels WHERE id = ${channel_id}
     `;
@@ -345,7 +361,6 @@ app.post('/api/channel/join', async (req, res) => {
       return res.status(403).json({ error: '❌ Неверный код приглашения' });
     }
 
-    // Добавляем участника
     await pool.sql`
       INSERT INTO channel_members (channel_id, user_id)
       VALUES (${channel_id}, ${user_id})
@@ -354,7 +369,11 @@ app.post('/api/channel/join', async (req, res) => {
     res.json({ success: true, message: '✅ Вы присоединились к каналу' });
   } catch (error) {
     console.error('❌ Channel join error:', error);
-    res.status(500).json({ error: '❌ Ошибка присоединения' });
+    if (error.message?.includes('duplicate key')) {
+      res.status(400).json({ error: '❌ Вы уже в этом канале' });
+    } else {
+      res.status(500).json({ error: '❌ Ошибка присоединения' });
+    }
   }
 });
 
