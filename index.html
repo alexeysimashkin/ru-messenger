@@ -438,7 +438,6 @@
       50% { transform: scale(1.05); }
     }
 
-    /* ========== МЕНЮ СКРЕПКИ ========== */
     #attachMenu {
       display: none;
       position: absolute;
@@ -790,7 +789,7 @@
       }
     }
 
-    // ========== ФОТО ==========
+    // ========== ФОТО (ОБНОВЛЁННЫЙ) ==========
     function triggerFileUpload() {
       document.getElementById('fileInput').click();
       document.getElementById('attachMenu').style.display = 'none';
@@ -815,27 +814,37 @@
         return;
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('from_user', currentUser.id);
-      formData.append('to_user', selectedUser.id);
-
       try {
-        const response = await fetch(API + '/upload', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-
-        const data = await response.json();
-        if (data.success) {
-          await loadMessages(selectedUser.id);
-        } else {
-          showError('❌ Ошибка загрузки фото: ' + (data.error || 'Неизвестная ошибка'));
-        }
+        const reader = new FileReader();
+        reader.onloadend = async function() {
+          const base64 = reader.result;
+          
+          try {
+            const data = await request('/upload', {
+              method: 'POST',
+              body: JSON.stringify({
+                from_user: currentUser.id,
+                to_user: selectedUser.id,
+                file_data: base64,
+                file_name: file.name,
+                file_type: file.type
+              })
+            });
+            
+            if (data.success) {
+              await loadMessages(selectedUser.id);
+            } else {
+              showError('❌ Ошибка загрузки фото: ' + (data.error || 'Неизвестная ошибка'));
+            }
+          } catch (error) {
+            console.error('❌ Upload error:', error);
+            showError('❌ Ошибка загрузки фото: ' + error.message);
+          }
+        };
+        reader.readAsDataURL(file);
       } catch (error) {
-        console.error('❌ Upload error:', error);
-        showError('❌ Ошибка загрузки фото: ' + error.message);
+        console.error('❌ File read error:', error);
+        showError('❌ Ошибка чтения файла: ' + error.message);
       }
 
       e.target.value = '';
@@ -1111,7 +1120,8 @@
                 <span class="icon">📄</span> Документ
               </div>
               <div class="menu-item" onclick="alert('Скоро будет доступно! 📍')">
-                <span class="icon">📍</span> Локация              </div>
+                <span class="icon">📍</span> Локация
+              </div>
               <div class="menu-item" onclick="alert('Скоро будет доступно! 😊')">
                 <span class="icon">😊</span> Стикер
               </div>
