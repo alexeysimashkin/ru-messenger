@@ -809,6 +809,8 @@ app.get('/c/:nickname', async (req, res) => {
       `);
     }
     
+    const channelId = rows[0].id;
+    
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -834,8 +836,8 @@ app.get('/c/:nickname', async (req, res) => {
           <div class="private-badge">🌐 Публичный</div>
           <h1>${rows[0].name}</h1>
           <div class="sub">@${rows[0].nickname}</div>
-          <p style="color:#888; margin-bottom:24px;">Создатель: ${rows[0].creator_name}</p>
-          <a href="/" class="btn">Открыть в мессенджере</a>
+          <p style="color:#888; margin-bottom:8px;">Создатель: ${rows[0].creator_name}</p>
+          <a href="/?open_channel=${channelId}" class="btn">📥 Перейти в канал</a>
           <div class="creator">Канал создан в RU Мессенджере</div>
         </div>
       </body>
