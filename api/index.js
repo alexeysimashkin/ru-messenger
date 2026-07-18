@@ -421,13 +421,13 @@ app.get('/api/channel/:nickname', async (req, res) => {
   }
 });
 
-// ========== ПРИСОЕДИНИТЬСЯ К КАНАЛУ ==========
-app.post('/api/channel/join', async (req, res) => {
+// ========== ПОДПИСАТЬСЯ НА КАНАЛ ==========
+app.post('/api/channel/subscribe', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
   }
 
-  const { channel_id, user_id, invite_code } = req.body;
+  const { channel_id, user_id } = req.body;
 
   if (!channel_id || !user_id) {
     return res.status(400).json({ error: '❌ Канал и пользователь обязательны' });
@@ -442,8 +442,8 @@ app.post('/api/channel/join', async (req, res) => {
       return res.status(404).json({ error: '❌ Канал не найден' });
     }
 
-    if (rows[0].is_private && rows[0].invite_code !== invite_code) {
-      return res.status(403).json({ error: '❌ Неверный код приглашения' });
+    if (rows[0].is_private) {
+      return res.status(403).json({ error: '❌ Приватный канал. Только по приглашению' });
     }
 
     await pool.sql`
@@ -451,14 +451,48 @@ app.post('/api/channel/join', async (req, res) => {
       VALUES (${channel_id}, ${user_id})
     `;
 
-    res.json({ success: true, message: '✅ Вы присоединились к каналу' });
+    res.json({ success: true, message: '✅ Вы подписались на канал' });
   } catch (error) {
-    console.error('❌ Channel join error:', error);
+    console.error('❌ Channel subscribe error:', error);
     if (error.message?.includes('duplicate key')) {
-      res.status(400).json({ error: '❌ Вы уже в этом канале' });
+      res.status(400).json({ error: '❌ Вы уже подписаны на этот канал' });
     } else {
-      res.status(500).json({ error: '❌ Ошибка присоединения' });
+      res.status(500).json({ error: '❌ Ошибка подписки' });
     }
+  }
+});
+
+// ========== ОТПИСАТЬСЯ ОТ КАНАЛА ==========
+app.post('/api/channel/unsubscribe', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { channel_id, user_id } = req.body;
+
+  if (!channel_id || !user_id) {
+    return res.status(400).json({ error: '❌ Канал и пользователь обязательны' });
+  }
+
+  try {
+    // Проверяем, не является ли пользователь создателем
+    const { rows } = await pool.sql`
+      SELECT created_by FROM channels WHERE id = ${channel_id}
+    `;
+
+    if (rows[0] && rows[0].created_by === user_id) {
+      return res.status(403).json({ error: '❌ Создатель не может отписаться от своего канала' });
+    }
+
+    await pool.sql`
+      DELETE FROM channel_members 
+      WHERE channel_id = ${channel_id} AND user_id = ${user_id}
+    `;
+
+    res.json({ success: true, message: '✅ Вы отписались от канала' });
+  } catch (error) {
+    console.error('❌ Channel unsubscribe error:', error);
+    res.status(500).json({ error: '❌ Ошибка отписки' });
   }
 });
 
@@ -491,7 +525,33 @@ app.get('/api/channels/:userId', async (req, res) => {
   }
 });
 
-// ========== ОТПРАВКА СООБЩЕНИЯ В КАНАЛ ==========
+// ========== ПРОВЕРКА ПРАВ НА КАНАЛ ==========
+app.get('/api/channel/check/:channelId/:userId', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  const { channelId, userId } = req.params;
+
+  try {
+    const { rows } = await pool.sql`
+      SELECT created_by FROM channels WHERE id = ${channelId}
+    `;
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: '❌ Канал не найден' });
+    }
+
+    const isAdmin = rows[0].created_by === Number(userId);
+
+    res.json({ isAdmin });
+  } catch (error) {
+    console.error('❌ Check error:', error);
+    res.status(500).json({ error: '❌ Ошибка проверки прав' });
+  }
+});
+
+// ========== ОТПРАВКА СООБЩЕНИЯ В КАНАЛ (только админ) ==========
 app.post('/api/channel/message', async (req, res) => {
   console.log('💬 Сообщение в канал:', req.body);
   
@@ -506,6 +566,19 @@ app.post('/api/channel/message', async (req, res) => {
   }
 
   try {
+    // Проверяем, является ли отправитель создателем канала
+    const { rows } = await pool.sql`
+      SELECT created_by FROM channels WHERE id = ${channel_id}
+    `;
+
+    if (!rows[0]) {
+      return res.status(404).json({ error: '❌ Канал не найден' });
+    }
+
+    if (rows[0].created_by !== from_user) {
+      return res.status(403).json({ error: '❌ Только создатель канала может отправлять сообщения' });
+    }
+
     await pool.sql`
       INSERT INTO channel_messages (channel_id, from_user, content, file_url, file_type, is_voice)
       VALUES (${channel_id}, ${from_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
@@ -810,6 +883,8 @@ app.get('/c/:nickname', async (req, res) => {
     }
     
     const channelId = rows[0].id;
+    const channelName = rows[0].name;
+    const channelNickname = rows[0].nickname;
     
     res.send(`
       <!DOCTYPE html>
@@ -817,28 +892,27 @@ app.get('/c/:nickname', async (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${rows[0].name} — RU Канал</title>
+        <title>${channelName} — RU Канал</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; color: white; }
           .container { background: #1a1a1a; border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; text-align: center; border: 1px solid #2a2a2a; }
           .icon { font-size: 64px; margin-bottom: 16px; }
           h1 { color: white; margin-bottom: 8px; }
-          .sub { color: #666; font-size: 14px; margin-bottom: 24px; }
+          .sub { color: #666; font-size: 14px; margin-bottom: 16px; }
           .btn { display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all 0.3s; }
           .btn:hover { transform: scale(1.02); box-shadow: 0 8px 30px rgba(108, 92, 231, 0.4); }
-          .creator { color: #555; font-size: 13px; margin-top: 16px; }
           .private-badge { background: #2a2a2a; color: #888; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; margin-bottom: 12px; }
+          .info { color: #555; font-size: 13px; margin-top: 8px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="icon">📢</div>
-          <div class="private-badge">🌐 Публичный</div>
-          <h1>${rows[0].name}</h1>
-          <div class="sub">@${rows[0].nickname}</div>
-          <p style="color:#888; margin-bottom:8px;">Создатель: ${rows[0].creator_name}</p>
-          <a href="/?open_channel=${channelId}" class="btn">📥 Перейти в канал</a>
-          <div class="creator">Канал создан в RU Мессенджере</div>
+          <div class="private-badge">🌐 Публичный канал</div>
+          <h1>${channelName}</h1>
+          <div class="sub">@${channelNickname}</div>
+          <a href="/?open_channel=${channelId}" class="btn">📥 Подписаться</a>
+          <div class="info">Подпишитесь, чтобы читать новости канала</div>
         </div>
       </body>
       </html>
