@@ -38,6 +38,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* ===== АВТОРИЗАЦИЯ ===== */
     .logo {
       text-align: center;
       margin-bottom: 36px;
@@ -205,6 +206,7 @@
       to { transform: rotate(360deg); }
     }
 
+    /* ===== ОБЩИЙ ИНТЕРФЕЙС ===== */
     .user-info {
       background: #f8f8fa;
       padding: 14px 20px;
@@ -258,6 +260,48 @@
       background: #fee;
     }
 
+    /* ===== ТАБЫ ===== */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      background: #f0f0f5;
+      border-radius: 14px;
+      padding: 4px;
+    }
+
+    .tabs button {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      background: transparent;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      color: #888;
+    }
+
+    .tabs button.active {
+      background: white;
+      color: #667eea;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .tabs button:hover:not(.active) {
+      color: #667eea;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ===== КОНТАКТЫ ===== */
     .contact {
       padding: 14px 16px;
       background: #f8f8fa;
@@ -300,6 +344,7 @@
       white-space: nowrap;
     }
 
+    /* ===== ЧАТ ===== */
     .messages-container {
       max-height: 360px;
       overflow-y: auto;
@@ -366,6 +411,7 @@
       border-radius: 8px;
     }
 
+    /* ===== ВВОД ===== */
     .input-container {
       display: flex;
       gap: 8px;
@@ -438,6 +484,7 @@
       50% { transform: scale(1.05); }
     }
 
+    /* ===== МЕНЮ СКРЕПКИ ===== */
     #attachMenu {
       display: none;
       position: absolute;
@@ -473,6 +520,7 @@
       text-align: center;
     }
 
+    /* ===== ХЕДЕР ЧАТА ===== */
     .chat-header {
       display: flex;
       align-items: center;
@@ -556,6 +604,27 @@
       display: none;
     }
 
+    .create-channel-btn {
+      width: 100%;
+      padding: 14px;
+      background: #f0f0f5;
+      border: 2px dashed #667eea;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #667eea;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 12px;
+    }
+
+    .create-channel-btn:hover {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    /* ===== АДАПТИВ ===== */
     @media (max-width: 480px) {
       #app {
         padding: 30px 20px;
@@ -602,13 +671,17 @@
     let token = localStorage.getItem('token');
     let currentUser = null;
     let selectedUser = null;
+    let selectedChannel = null;
     let contacts = [];
+    let channels = [];
     let messages = [];
     let isLoginMode = true;
     let isLoading = false;
     let isRecording = false;
     let mediaRecorder = null;
     let audioChunks = [];
+    let currentTab = 'chats';
+    let channelMessages = [];
 
     function formatTime(date) {
       return new Date(date).toLocaleTimeString('ru-RU', { 
@@ -714,10 +787,27 @@
       token = null;
       currentUser = null;
       selectedUser = null;
+      selectedChannel = null;
       renderAuth();
     }
 
-    // ========== ПОИСК ==========
+    // ========== ТАБЫ ==========
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.querySelector(`.tabs button[data-tab="${tab}"]`).classList.add('active');
+      
+      if (tab === 'chats') {
+        loadChats();
+      } else if (tab === 'channels') {
+        loadChannels();
+      }
+    }
+
+    // ========== ПОИСК ПОЛЬЗОВАТЕЛЕЙ ==========
     async function searchUsers() {
       const query = document.getElementById('searchInput').value.trim();
       if (!query) { contacts = []; renderContacts(); return; }
@@ -728,7 +818,7 @@
       } catch (error) { showError(error.message); }
     }
 
-    // ========== СООБЩЕНИЯ ==========
+    // ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
     async function loadMessages(userId) {
       try {
         console.log('📥 Загрузка сообщений с пользователем ID:', userId);
@@ -767,6 +857,244 @@
       } catch (error) { showError(error.message); }
     }
 
+    // ========== КАНАЛЫ ==========
+    async function loadChannels() {
+      try {
+        const data = await request(`/channels/${currentUser.id}`);
+        channels = data;
+        renderChannels();
+      } catch (error) { showError(error.message); }
+    }
+
+    async function loadChannelMessages(channelId) {
+      try {
+        const data = await request(`/channel/messages/${channelId}`);
+        channelMessages = data;
+        renderChannelMessages();
+      } catch (error) {
+        showError('Ошибка загрузки сообщений канала: ' + error.message);
+      }
+    }
+
+    async function sendChannelMessage() {
+      const content = document.getElementById('channelMessageInput').value.trim();
+      if (!content || !selectedChannel) return;
+
+      try {
+        await request('/channel/message', {
+          method: 'POST',
+          body: JSON.stringify({
+            channel_id: selectedChannel.id,
+            from_user: currentUser.id,
+            content
+          })
+        });
+        document.getElementById('channelMessageInput').value = '';
+        await loadChannelMessages(selectedChannel.id);
+      } catch (error) { showError(error.message); }
+    }
+
+    function selectChannel(channel) {
+      selectedChannel = channel;
+      document.getElementById('channelChatView').style.display = 'block';
+      document.getElementById('channelListView').style.display = 'none';
+      document.getElementById('selectedChannelName').textContent = channel.name;
+      document.getElementById('selectedChannelNickname').textContent = channel.nickname ? '@' + channel.nickname : '';
+      loadChannelMessages(channel.id);
+    }
+
+    function goBackToChannels() {
+      selectedChannel = null;
+      document.getElementById('channelChatView').style.display = 'none';
+      document.getElementById('channelListView').style.display = 'block';
+      loadChannels();
+    }
+
+    // ========== СОЗДАНИЕ КАНАЛА ==========
+    function showCreateChannelModal() {
+      document.getElementById('createChannelModal').style.display = 'block';
+    }
+
+    function closeCreateChannelModal() {
+      document.getElementById('createChannelModal').style.display = 'none';
+    }
+
+    async function createChannel() {
+      const name = document.getElementById('channelName').value.trim();
+      const nickname = document.getElementById('channelNickname').value.trim();
+      const isPrivate = document.getElementById('channelPrivate').checked;
+
+      if (!name) {
+        showError('❌ Введите название канала');
+        return;
+      }
+
+      try {
+        const data = await request('/channel/create', {
+          method: 'POST',
+          body: JSON.stringify({
+            name,
+            nickname: nickname || undefined,
+            is_private: isPrivate,
+            created_by: currentUser.id
+          })
+        });
+
+        if (data.success) {
+          showError('✅ Канал создан!', true);
+          closeCreateChannelModal();
+          loadChannels();
+        }
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+
+    // ========== ОТРИСОВКА ==========
+    function renderContacts() {
+      const container = document.getElementById('contactsList');
+      if (!container) return;
+
+      if (contacts.length === 0) {
+        container.innerHTML = `
+          <div class="empty">
+            <span class="icon">🔍</span>
+            ${document.getElementById('searchInput')?.value ? 'Никого не найдено' : 'Начните поиск друзей'}
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = contacts.map(c => {
+        const contactId = c.id || c.contact_id;
+        const name = c.name || 'Без имени';
+        const nickname = c.nickname || 'unknown';
+        const lastMessage = c.last_message || '';
+        
+        return `
+          <div class="contact" onclick="selectUser({id: ${contactId}, name: '${name}', nickname: '${nickname}'})">
+            <div>
+              <div class="name">${name}</div>
+              <div class="nickname">@${nickname}</div>
+            </div>
+            ${lastMessage ? `<span class="badge">${lastMessage.slice(0, 30)}${lastMessage.length > 30 ? '...' : ''}</span>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderChannels() {
+      const container = document.getElementById('channelsList');
+      if (!container) return;
+
+      if (channels.length === 0) {
+        container.innerHTML = `
+          <div class="empty">
+            <span class="icon">📢</span>
+            У вас нет каналов
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = channels.map(c => `
+        <div class="contact" onclick="selectChannel(${JSON.stringify(c).replace(/"/g, '&quot;')})">
+          <div>
+            <div class="name">${c.name}</div>
+            <div class="nickname">${c.nickname ? '@' + c.nickname : 'Приватный'}</div>
+          </div>
+          <span class="badge">${c.is_private ? '🔒' : '🌐'}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderChannelMessages() {
+      const container = document.getElementById('channelMessagesList');
+      if (!container) return;
+
+      if (channelMessages.length === 0) {
+        container.innerHTML = `<div class="empty"><span class="icon">💬</span>Начните общение в канале</div>`;
+        return;
+      }
+
+      container.innerHTML = channelMessages.map(m => {
+        const isMy = m.from_user === currentUser.id;
+        return `
+          <div class="message ${isMy ? 'my' : 'other'}">
+            ${!isMy ? `<div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${m.from_name || 'Пользователь'}</div>` : ''}
+            ${m.content || ''}
+            <div class="time">${formatTime(m.timestamp)}</div>
+          </div>
+        `;
+      }).join('');
+      
+      setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    }
+
+    function selectUser(user) {
+      if (!user || !user.id) {
+        showError('❌ Ошибка: пользователь не имеет ID');
+        return;
+      }
+
+      selectedUser = user;
+      selectedChannel = null;
+      document.getElementById('chatView').style.display = 'block';
+      document.getElementById('contactsView').style.display = 'none';
+      document.getElementById('selectedUserName').textContent = user.name || 'Пользователь';
+      document.getElementById('selectedUserNickname').textContent = '@' + (user.nickname || 'unknown');
+      loadMessages(user.id);
+    }
+
+    function goBackToChats() {
+      selectedUser = null;
+      document.getElementById('chatView').style.display = 'none';
+      document.getElementById('contactsView').style.display = 'block';
+      loadChats();
+    }
+
+    function renderMessages() {
+      const container = document.getElementById('messagesList');
+      if (!container) return;
+
+      if (messages.length === 0) {
+        container.innerHTML = `<div class="empty"><span class="icon">💬</span>Начните переписку</div>`;
+        return;
+      }
+
+      container.innerHTML = messages.map(m => {
+        const isMy = m.from_user === currentUser.id;
+        let contentHtml = '';
+
+        if (m.content) {
+          contentHtml += m.content;
+        }
+
+        if (m.file_url && m.file_type?.startsWith('image/')) {
+          contentHtml += `<img src="${m.file_url}" class="file-img" alt="Фото" />`;
+        }
+
+        if (m.is_voice && m.file_url) {
+          contentHtml += `
+            <audio controls>
+              <source src="${m.file_url}" type="${m.file_type || 'audio/webm'}">
+              Ваш браузер не поддерживает аудио
+            </audio>
+          `;
+        }
+
+        return `
+          <div class="message ${isMy ? 'my' : 'other'}">
+            ${!isMy ? `<div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${m.from_name || 'Собеседник'}</div>` : ''}
+            ${contentHtml}
+            <div class="time">${formatTime(m.timestamp)}</div>
+          </div>
+        `;
+      }).join('');
+      
+      setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    }
+
     // ========== МЕНЮ СКРЕПКИ ==========
     function toggleAttachMenu() {
       const menu = document.getElementById('attachMenu');
@@ -789,7 +1117,7 @@
       }
     }
 
-    // ========== ФОТО (ИСПРАВЛЕННЫЙ) ==========
+    // ========== ФОТО ==========
     function triggerFileUpload() {
       document.getElementById('fileInput').click();
       document.getElementById('attachMenu').style.display = 'none';
@@ -853,9 +1181,8 @@
       e.target.value = '';
     }
 
-    // ========== ГОЛОСОВЫЕ ==========
-    function triggerVoiceRecord() {
-      document.getElementById('attachMenu').style.display = 'none';
+    // ========== ГОЛОСОВЫЕ (ОТДЕЛЬНАЯ КНОПКА) ==========
+    function toggleVoiceRecord() {
       if (isRecording) {
         stopRecording();
       } else {
@@ -880,6 +1207,8 @@
           const reader = new FileReader();
           reader.onloadend = async () => {
             const base64Audio = reader.result;
+            
+            // Отправляем в личный чат или канал
             if (selectedUser) {
               try {
                 await request('/message', {
@@ -894,6 +1223,23 @@
                   })
                 });
                 await loadMessages(selectedUser.id);
+              } catch (error) {
+                showError('❌ Ошибка отправки голосового: ' + error.message);
+              }
+            } else if (selectedChannel) {
+              try {
+                await request('/channel/message', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    channel_id: selectedChannel.id,
+                    from_user: currentUser.id,
+                    content: '🎤 Голосовое сообщение',
+                    file_url: base64Audio,
+                    file_type: 'audio/webm',
+                    is_voice: true
+                  })
+                });
+                await loadChannelMessages(selectedChannel.id);
               } catch (error) {
                 showError('❌ Ошибка отправки голосового: ' + error.message);
               }
@@ -922,102 +1268,6 @@
         mediaRecorder.stop();
         showError('✅ Голосовое отправлено!', true);
       }
-    }
-
-    // ========== ОТРИСОВКА ==========
-    function renderContacts() {
-      const container = document.getElementById('contactsList');
-      if (!container) return;
-
-      if (contacts.length === 0) {
-        container.innerHTML = `
-          <div class="empty">
-            <span class="icon">🔍</span>
-            ${document.getElementById('searchInput')?.value ? 'Никого не найдено' : 'Начните поиск друзей'}
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = contacts.map(c => {
-        const contactId = c.id || c.contact_id;
-        const name = c.name || 'Без имени';
-        const nickname = c.nickname || 'unknown';
-        const lastMessage = c.last_message || '';
-        
-        return `
-          <div class="contact" onclick="selectUser({id: ${contactId}, name: '${name}', nickname: '${nickname}'})">
-            <div>
-              <div class="name">${name}</div>
-              <div class="nickname">@${nickname}</div>
-            </div>
-            ${lastMessage ? `<span class="badge">${lastMessage.slice(0, 30)}${lastMessage.length > 30 ? '...' : ''}</span>` : ''}
-          </div>
-        `;
-      }).join('');
-    }
-
-    function selectUser(user) {
-      if (!user || !user.id) {
-        showError('❌ Ошибка: пользователь не имеет ID');
-        return;
-      }
-
-      selectedUser = user;
-      document.getElementById('chatView').style.display = 'block';
-      document.getElementById('contactsView').style.display = 'none';
-      document.getElementById('selectedUserName').textContent = user.name || 'Пользователь';
-      document.getElementById('selectedUserNickname').textContent = '@' + (user.nickname || 'unknown');
-      loadMessages(user.id);
-    }
-
-    function goBack() {
-      selectedUser = null;
-      document.getElementById('chatView').style.display = 'none';
-      document.getElementById('contactsView').style.display = 'block';
-      loadChats();
-    }
-
-    function renderMessages() {
-      const container = document.getElementById('messagesList');
-      if (!container) return;
-
-      if (messages.length === 0) {
-        container.innerHTML = `<div class="empty"><span class="icon">💬</span>Начните переписку</div>`;
-        return;
-      }
-
-      container.innerHTML = messages.map(m => {
-        const isMy = m.from_user === currentUser.id;
-        let contentHtml = '';
-
-        if (m.content) {
-          contentHtml += m.content;
-        }
-
-        if (m.file_url && m.file_type?.startsWith('image/')) {
-          contentHtml += `<img src="${m.file_url}" class="file-img" alt="Фото" />`;
-        }
-
-        if (m.is_voice && m.file_url) {
-          contentHtml += `
-            <audio controls>
-              <source src="${m.file_url}" type="${m.file_type || 'audio/webm'}">
-              Ваш браузер не поддерживает аудио
-            </audio>
-          `;
-        }
-
-        return `
-          <div class="message ${isMy ? 'my' : 'other'}">
-            ${!isMy ? `<div style="font-size:11px;opacity:0.7;margin-bottom:3px;">${m.from_name || 'Собеседник'}</div>` : ''}
-            ${contentHtml}
-            <div class="time">${formatTime(m.timestamp)}</div>
-          </div>
-        `;
-      }).join('');
-      
-      setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
     }
 
     // ========== ЭКРАН АВТОРИЗАЦИИ ==========
@@ -1087,54 +1337,112 @@
           <button class="logout-btn" onclick="logout()" title="Выйти">⏻</button>
         </div>
 
-        <div id="contactsView">
-          <div class="search-row">
-            <input id="searchInput" placeholder="🔍 Найти по никнейму..." />
-            <button onclick="searchUsers()">Найти</button>
-          </div>
-          <div id="contactsList"></div>
+        <div class="tabs">
+          <button data-tab="chats" class="active" onclick="switchTab('chats')">💬 Чаты</button>
+          <button data-tab="channels" onclick="switchTab('channels')">📢 Каналы</button>
         </div>
 
-        <div id="chatView" style="display:none;">
-          <div class="chat-header">
-            <button class="back" onclick="goBack()">←</button>
-            <div>
-              <div id="selectedUserName" style="font-weight:600;color:#1a1a1a;"></div>
-              <div id="selectedUserNickname" style="font-size:13px;color:#888;"></div>
+        <!-- Вкладка Чаты -->
+        <div id="tab-chats" class="tab-content active">
+          <div id="contactsView">
+            <div class="search-row">
+              <input id="searchInput" placeholder="🔍 Найти по никнейму..." />
+              <button onclick="searchUsers()">Найти</button>
             </div>
+            <div id="contactsList"></div>
           </div>
-          
-          <div class="messages-container" id="messagesList"></div>
-          
-          <div class="input-container">
-            <input id="messageInput" placeholder="Введите сообщение..." />
-            <button onclick="sendMessage()">Отправить</button>
-            
-            <button class="icon-btn" id="attachBtn" onclick="toggleAttachMenu()" title="Прикрепить">📎</button>
-            
-            <div id="attachMenu">
-              <div class="menu-item" onclick="triggerFileUpload()">
-                <span class="icon">🖼️</span> Фото
-              </div>
-              <div class="menu-item" id="voiceBtn" onclick="triggerVoiceRecord()">
-                <span class="icon">🎤</span> Голосовое
-              </div>
-              <div class="menu-item" onclick="alert('Скоро будет доступно! 📄')">
-                <span class="icon">📄</span> Документ
-              </div>
-              <div class="menu-item" onclick="alert('Скоро будет доступно! 📍')">
-                <span class="icon">📍</span> Локация
-              </div>
-              <div class="menu-item" onclick="alert('Скоро будет доступно! 😊')">
-                <span class="icon">😊</span> Стикер
+
+          <div id="chatView" style="display:none;">
+            <div class="chat-header">
+              <button class="back" onclick="goBackToChats()">←</button>
+              <div>
+                <div id="selectedUserName" style="font-weight:600;color:#1a1a1a;"></div>
+                <div id="selectedUserNickname" style="font-size:13px;color:#888;"></div>
               </div>
             </div>
+            
+            <div class="messages-container" id="messagesList"></div>
+            
+            <div class="input-container">
+              <input id="messageInput" placeholder="Введите сообщение..." />
+              <button onclick="sendMessage()">Отправить</button>
+              <button class="icon-btn" id="voiceBtn" onclick="toggleVoiceRecord()" title="Голосовое">🎤</button>
+              <button class="icon-btn" id="attachBtn" onclick="toggleAttachMenu()" title="Прикрепить">📎</button>
+              
+              <div id="attachMenu">
+                <div class="menu-item" onclick="triggerFileUpload()">
+                  <span class="icon">🖼️</span> Фото
+                </div>
+                <div class="menu-item" onclick="alert('Скоро будет доступно! 📄')">
+                  <span class="icon">📄</span> Документ
+                </div>
+                <div class="menu-item" onclick="alert('Скоро будет доступно! 📍')">
+                  <span class="icon">📍</span> Локация
+                </div>
+                <div class="menu-item" onclick="alert('Скоро будет доступно! 😊')">
+                  <span class="icon">😊</span> Стикер
+                </div>
+              </div>
+            </div>
+            
+            <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="handleFileSelect(event)" />
           </div>
-          
-          <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="handleFileSelect(event)" />
+        </div>
+
+        <!-- Вкладка Каналы -->
+        <div id="tab-channels" class="tab-content">
+          <div id="channelListView">
+            <button class="create-channel-btn" onclick="showCreateChannelModal()">➕ Создать канал</button>
+            <div id="channelsList"></div>
+          </div>
+
+          <div id="channelChatView" style="display:none;">
+            <div class="chat-header">
+              <button class="back" onclick="goBackToChannels()">←</button>
+              <div>
+                <div id="selectedChannelName" style="font-weight:600;color:#1a1a1a;"></div>
+                <div id="selectedChannelNickname" style="font-size:13px;color:#888;"></div>
+              </div>
+            </div>
+            
+            <div class="messages-container" id="channelMessagesList"></div>
+            
+            <div class="input-container">
+              <input id="channelMessageInput" placeholder="Введите сообщение в канал..." />
+              <button onclick="sendChannelMessage()">Отправить</button>
+              <button class="icon-btn" onclick="toggleVoiceRecord()" title="Голосовое">🎤</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Модалка создания канала -->
+        <div id="createChannelModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; display:none; justify-content:center; align-items:center;">
+          <div style="background:white; border-radius:24px; padding:32px; max-width:400px; width:90%;">
+            <h3 style="margin-bottom:16px;">📢 Создать канал</h3>
+            
+            <div class="form-group">
+              <label>Название канала *</label>
+              <input id="channelName" placeholder="Мой канал" />
+            </div>
+            
+            <div class="form-group">
+              <label>Никнейм канала (для публичного)</label>
+              <input id="channelNickname" placeholder="my-channel" />
+              <div style="font-size:12px;color:#888;margin-top:4px;">ru-mes.vercel.app/c/<span id="channelPreview">никнейм</span></div>
+            </div>
+            
+            <div class="form-group" style="display:flex; align-items:center; gap:10px;">
+              <input type="checkbox" id="channelPrivate" style="width:18px;height:18px;" />
+              <label style="margin:0;">Приватный канал (по приглашению)</label>
+            </div>
+            
+            <button class="btn-primary" onclick="createChannel()">Создать</button>
+            <button class="btn-primary" style="background:#e74c3c; margin-top:8px;" onclick="closeCreateChannelModal()">Отмена</button>
+          </div>
         </div>
       `;
 
+      // Обработчики Enter
       document.getElementById('searchInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') searchUsers();
       });
@@ -1143,7 +1451,17 @@
         if (e.key === 'Enter') sendMessage();
       });
 
+      document.getElementById('channelMessageInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sendChannelMessage();
+      });
+
+      // Превью ссылки
+      document.getElementById('channelNickname').addEventListener('input', function() {
+        document.getElementById('channelPreview').textContent = this.value || 'никнейм';
+      });
+
       loadChats();
+      loadChannels();
     }
 
     // ========== ЗАПУСК ==========
