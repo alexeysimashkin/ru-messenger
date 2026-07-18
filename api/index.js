@@ -58,7 +58,7 @@ app.get('/api/check', async (req, res) => {
   }
 });
 
-// ========== ПОСЛЕДНЯЯ НАДЕЖДА - ПРЯМОЕ ДОБАВЛЕНИЕ КОЛОНОК ==========
+// ========== ДОБАВЛЕНИЕ КОЛОНОК (ИСПРАВЛЕННЫЙ) ==========
 app.get('/api/add-columns', async (req, res) => {
   if (!pool) {
     return res.status(500).json({ error: '❌ База не подключена' });
@@ -67,22 +67,36 @@ app.get('/api/add-columns', async (req, res) => {
   try {
     console.log('🔧 Запуск добавления колонок...');
     
-    const queries = [
-      { name: 'file_url', sql: 'ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT' },
-      { name: 'file_type', sql: 'ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT' },
-      { name: 'is_voice', sql: 'ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE' }
-    ];
-
     const results = [];
-    for (const q of queries) {
-      try {
-        await pool.sql(q.sql);
-        results.push({ column: q.name, status: '✅ добавлена' });
-        console.log(`✅ Добавлена колонка ${q.name}`);
-      } catch (err) {
-        results.push({ column: q.name, status: '❌ ошибка', error: err.message });
-        console.error(`❌ Ошибка при добавлении ${q.name}:`, err.message);
-      }
+
+    // file_url
+    try {
+      await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`;
+      results.push({ column: 'file_url', status: '✅ добавлена' });
+      console.log('✅ Добавлена колонка file_url');
+    } catch (err) {
+      results.push({ column: 'file_url', status: '❌ ошибка', error: err.message });
+      console.error('❌ Ошибка file_url:', err.message);
+    }
+
+    // file_type
+    try {
+      await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`;
+      results.push({ column: 'file_type', status: '✅ добавлена' });
+      console.log('✅ Добавлена колонка file_type');
+    } catch (err) {
+      results.push({ column: 'file_type', status: '❌ ошибка', error: err.message });
+      console.error('❌ Ошибка file_type:', err.message);
+    }
+
+    // is_voice
+    try {
+      await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE`;
+      results.push({ column: 'is_voice', status: '✅ добавлена' });
+      console.log('✅ Добавлена колонка is_voice');
+    } catch (err) {
+      results.push({ column: 'is_voice', status: '❌ ошибка', error: err.message });
+      console.error('❌ Ошибка is_voice:', err.message);
     }
 
     const { rows } = await pool.sql`
