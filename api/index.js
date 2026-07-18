@@ -92,6 +92,60 @@ app.post('/api/migrate', async (req, res) => {
   }
 });
 
+// ========== ПРИНУДИТЕЛЬНОЕ СОЗДАНИЕ ТАБЛИЦ КАНАЛОВ (GET) ==========
+app.get('/api/create-channels', async (req, res) => {
+  if (!pool) {
+    return res.status(500).json({ error: '❌ База не подключена' });
+  }
+
+  try {
+    console.log('🔧 Принудительное создание таблиц каналов...');
+    
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS channels (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        nickname TEXT UNIQUE,
+        is_private BOOLEAN DEFAULT FALSE,
+        invite_code TEXT UNIQUE,
+        created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS channel_members (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        joined_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(channel_id, user_id)
+      )
+    `;
+    await pool.sql`
+      CREATE TABLE IF NOT EXISTS channel_messages (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        content TEXT,
+        file_url TEXT,
+        file_type TEXT,
+        is_voice BOOLEAN DEFAULT FALSE,
+        timestamp TIMESTAMP DEFAULT NOW()
+      )
+    `;
+    
+    console.log('✅ Таблицы каналов созданы (GET)');
+    res.json({ 
+      success: true, 
+      message: '✅ Таблицы каналов созданы!',
+      tables: ['channels', 'channel_members', 'channel_messages']
+    });
+  } catch (error) {
+    console.error('❌ Create channels error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ========== ИНИЦИАЛИЗАЦИЯ ==========
 app.post('/api/init', async (req, res) => {
   if (!pool) {
@@ -431,7 +485,6 @@ app.post('/api/channel/message', async (req, res) => {
       VALUES (${channel_id}, ${from_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
     `;
     
-    // Отправляем уведомление всем клиентам
     notifyClients({ type: 'channel_message', channel_id });
     
     res.json({ success: true });
@@ -488,7 +541,6 @@ app.post('/api/message', async (req, res) => {
       VALUES (${from_user}, ${to_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})
     `;
     
-    // Отправляем уведомление получателю
     notifyClients({ type: 'new_message', to_user, from_user });
     
     res.json({ success: true });
@@ -618,7 +670,7 @@ app.get('/api/chats/:userId', async (req, res) => {
   }
 });
 
-// ========== SERVER-SENT EVENTS (SSE) ДЛЯ LIVE-ОБНОВЛЕНИЙ ==========
+// ========== SERVER-SENT EVENTS (SSE) ==========
 app.get('/api/events', (req, res) => {
   console.log('🔌 Клиент подключился к SSE');
   
@@ -636,7 +688,6 @@ app.get('/api/events', (req, res) => {
   clients.push(newClient);
   console.log(`✅ Клиент ${clientId} подключен. Всего клиентов: ${clients.length}`);
 
-  // Отправляем приветственное сообщение
   res.write(`data: ${JSON.stringify({ type: 'connected', clientId })}\n\n`);
 
   req.on('close', () => {
@@ -646,7 +697,6 @@ app.get('/api/events', (req, res) => {
   });
 });
 
-// Функция уведомления всех клиентов
 function notifyClients(data) {
   console.log(`📤 Отправка уведомления ${clients.length} клиентам:`, data);
   
