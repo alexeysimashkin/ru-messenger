@@ -1,3 +1,21 @@
+// ========== ПРИНУДИТЕЛЬНАЯ МИГРАЦИЯ ПРИ ЗАПУСКЕ ==========
+(async function migrate() {
+  if (!process.env.POSTGRES_URL) return;
+  
+  try {
+    const { createPool } = await import('@vercel/postgres');
+    const pool = createPool({ connectionString: process.env.POSTGRES_URL });
+    
+    await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`;
+    await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`;
+    await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE`;
+    
+    console.log('✅ Миграция выполнена!');
+  } catch (e) {
+    console.log('⚠️ Миграция:', e.message);
+  }
+})();
+
 import express from 'express';
 import { createPool } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
@@ -54,66 +72,6 @@ app.get('/api/check', async (req, res) => {
       hasIsVoice: columns.includes('is_voice')
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ========== ДОБАВЛЕНИЕ КОЛОНОК (ИСПРАВЛЕННЫЙ) ==========
-app.get('/api/add-columns', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ error: '❌ База не подключена' });
-  }
-
-  try {
-    console.log('🔧 Запуск добавления колонок...');
-    
-    const results = [];
-
-    // file_url
-    try {
-      await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`;
-      results.push({ column: 'file_url', status: '✅ добавлена' });
-      console.log('✅ Добавлена колонка file_url');
-    } catch (err) {
-      results.push({ column: 'file_url', status: '❌ ошибка', error: err.message });
-      console.error('❌ Ошибка file_url:', err.message);
-    }
-
-    // file_type
-    try {
-      await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_type TEXT`;
-      results.push({ column: 'file_type', status: '✅ добавлена' });
-      console.log('✅ Добавлена колонка file_type');
-    } catch (err) {
-      results.push({ column: 'file_type', status: '❌ ошибка', error: err.message });
-      console.error('❌ Ошибка file_type:', err.message);
-    }
-
-    // is_voice
-    try {
-      await pool.sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_voice BOOLEAN DEFAULT FALSE`;
-      results.push({ column: 'is_voice', status: '✅ добавлена' });
-      console.log('✅ Добавлена колонка is_voice');
-    } catch (err) {
-      results.push({ column: 'is_voice', status: '❌ ошибка', error: err.message });
-      console.error('❌ Ошибка is_voice:', err.message);
-    }
-
-    const { rows } = await pool.sql`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'messages'
-    `;
-    const columns = rows.map(r => r.column_name);
-
-    res.json({ 
-      success: true,
-      message: '✅ Таблица обновлена!',
-      added: results,
-      currentColumns: columns
-    });
-  } catch (error) {
-    console.error('❌ Ошибка:', error);
     res.status(500).json({ error: error.message });
   }
 });
