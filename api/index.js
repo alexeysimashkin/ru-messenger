@@ -1,126 +1,48 @@
-import express from 'express';
-import { createPool } from '@vercel/postgres';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
+// ============================================================
+// ГЛАВНЫЙ ФАЙЛ API ДЛЯ VERCEL
+// ============================================================
 
-const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-let pool = null;
-let clients = [];
-
-try {
-  if (process.env.POSTGRES_URL) {
-    pool = createPool({
-      connectionString: process.env.POSTGRES_URL
+export default function handler(req, res) {
+  // ==== ЕСЛИ ЗАПРОС К API ====
+  if (req.url.startsWith('/api/')) {
+    res.status(200).json({
+      status: 'ok',
+      message: 'API работает!',
+      path: req.url,
+      method: req.method
     });
-    console.log('✅ База данных подключена');
+    return;
   }
-} catch (err) {
-  console.error('❌ Ошибка подключения к БД:', err.message);
+
+  // ==== ЕСЛИ ЗАПРОС К КОРНЮ ИЛИ СТАТИКЕ ====
+  // Просто отдаём HTML
+  res.setHeader('Content-Type', 'text/html');
+  res.status(200).send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>RU Мессенджер</title>
+      <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, sans-serif; background: #0a0a0a; min-height: 100vh; display: flex; justify-content: center; align-items: center; color: white; }
+        .container { background: #1a1a1a; padding: 40px; border-radius: 24px; max-width: 400px; width: 90%; text-align: center; border: 1px solid #2a2a2a; }
+        h1 { font-size: 32px; margin-bottom: 8px; }
+        .sub { color: #666; font-size: 14px; margin-bottom: 24px; }
+        .status { color: #51cf66; font-weight: 600; }
+        .btn { display: inline-block; padding: 12px 32px; background: #6c5ce7; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; margin-top: 16px; }
+        .btn:hover { background: #5a4bd1; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>📱 RU</h1>
+        <div class="sub">Мессенджер</div>
+        <div class="status">✅ Сервер работает</div>
+        <a href="https://github.com/alexeysimashkin/ru-messenger" class="btn">GitHub</a>
+      </div>
+    </body>
+    </html>
+  `);
 }
-
-// ========== ЗДОРОВЬЕ ==========
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: '✅ API работает!',
-    timestamp: new Date().toISOString(),
-    postgres: !!pool
-  });
-});
-
-// ========== ТЕСТОВАЯ РЕГИСТРАЦИЯ ==========
-app.post('/api/register', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ error: '❌ База не подключена' });
-  }
-
-  const { email, name, nickname, password } = req.body;
-
-  if (!email || !name || !nickname || !password) {
-    return res.status(400).json({ error: '❌ Все поля обязательны' });
-  }
-
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await pool.sql`
-      INSERT INTO users (email, name, nickname, password)
-      VALUES (${email}, ${name}, ${nickname}, ${hashedPassword})
-      RETURNING id, email, name, nickname
-    `;
-    
-    res.json({ 
-      success: true, 
-      message: '✅ Регистрация успешна!',
-      user: result.rows[0]
-    });
-  } catch (error) {
-    console.error('❌ Register error:', error);
-    if (error.message?.includes('duplicate key')) {
-      res.status(400).json({ error: '❌ Email или никнейм уже занят' });
-    } else {
-      res.status(500).json({ error: '❌ Ошибка сервера' });
-    }
-  }
-});
-
-// ========== ТЕСТОВЫЙ ВХОД ==========
-app.post('/api/login', async (req, res) => {
-  if (!pool) {
-    return res.status(500).json({ error: '❌ База не подключена' });
-  }
-
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: '❌ Email и пароль обязательны' });
-  }
-
-  try {
-    const { rows } = await pool.sql`
-      SELECT * FROM users WHERE email = ${email}
-    `;
-
-    if (!rows[0]) {
-      return res.status(400).json({ error: '❌ Пользователь не найден' });
-    }
-
-    const valid = await bcrypt.compare(password, rows[0].password);
-    if (!valid) {
-      return res.status(400).json({ error: '❌ Неверный пароль' });
-    }
-
-    const token = jwt.sign(
-      { id: rows[0].id },
-      process.env.JWT_SECRET || 'secret',
-      { expiresIn: '30d' }
-    );
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: rows[0].id,
-        email: rows[0].email,
-        name: rows[0].name,
-        nickname: rows[0].nickname
-      }
-    });
-  } catch (error) {
-    console.error('❌ Login error:', error);
-    res.status(500).json({ error: '❌ Ошибка сервера' });
-  }
-});
-
-// ========== 404 ==========
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: '❌ Маршрут не найден',
-    path: req.path
-  });
-});
-
-export default app;
