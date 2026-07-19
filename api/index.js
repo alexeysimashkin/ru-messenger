@@ -3,6 +3,11 @@ import { createPool } from '@vercel/postgres';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -17,12 +22,15 @@ try {
       connectionString: process.env.POSTGRES_URL
     });
     console.log('✅ База данных подключена');
-  } else {
-    console.log('⚠️ POSTGRES_URL не найдена, база не подключена');
   }
 } catch (err) {
   console.error('❌ Ошибка подключения к БД:', err.message);
 }
+
+// ========== ГЛАВНАЯ СТРАНИЦА ==========
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../index.html'));
+});
 
 // ========== ЗДОРОВЬЕ ==========
 app.get('/api/health', (req, res) => {
@@ -178,7 +186,6 @@ app.post('/api/init', async (req, res) => {
       )
     `;
     
-    // ===== СОЗДАЁМ СИСТЕМНЫЙ КАНАЛ =====
     const systemChannelNickname = 'ru_news';
     const { rows: existing } = await pool.sql`
       SELECT id FROM channels WHERE nickname = ${systemChannelNickname}
