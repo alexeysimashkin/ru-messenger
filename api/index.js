@@ -328,7 +328,6 @@ app.post('/api/profile/update', async (req, res) => {
   }
 
   try {
-    // Проверяем уникальность никнейма
     if (nickname) {
       const { rows } = await pool.sql`
         SELECT id FROM users WHERE nickname = ${nickname} AND id != ${user_id}
@@ -477,7 +476,6 @@ app.post('/api/channel/update', async (req, res) => {
   }
 
   try {
-    // Проверяем, является ли пользователь создателем
     const { rows: checkRows } = await pool.sql`
       SELECT created_by FROM channels WHERE id = ${channel_id}
     `;
@@ -490,7 +488,6 @@ app.post('/api/channel/update', async (req, res) => {
       return res.status(403).json({ error: '❌ Только создатель может редактировать канал' });
     }
 
-    // Проверяем уникальность никнейма
     if (nickname) {
       const { rows: dupRows } = await pool.sql`
         SELECT id FROM channels WHERE nickname = ${nickname} AND id != ${channel_id}
@@ -943,7 +940,6 @@ app.get('/api/events', (req, res) => {
   clients.push(newClient);
   console.log(`✅ Клиент ${clientId} подключен. Всего клиентов: ${clients.length}`);
 
-  // Отправляем keep-alive каждые 10 секунд
   const pingInterval = setInterval(() => {
     try {
       res.write(`: ping\n\n`);
@@ -1065,4 +1061,5 @@ app.use('*', (req, res) => {
   });
 });
 
+// ========== ВАЖНО: ЭКСПОРТ ДЛЯ VERCEL ==========
 export default app;
