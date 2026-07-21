@@ -1,5 +1,6 @@
 import express from 'express';
-import { createPool } from '@vercel/postgres';
+import pkg from 'pg';
+const { Pool } = pkg;
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,8 +14,9 @@ let clients = [];
 
 try {
   if (process.env.POSTGRES_URL) {
-    pool = createPool({
-      connectionString: process.env.POSTGRES_URL
+    pool = new Pool({
+      connectionString: process.env.POSTGRES_URL,
+      ssl: { rejectUnauthorized: false }
     });
     console.log('✅ База данных подключена');
   } else {
@@ -496,7 +498,6 @@ async function loadMessages(userId) {
     const data = await request('/messages/' + currentUser.id + '/' + userId);
     messages = data;
     renderMessages();
-    // Отмечаем прочитанные
     for (const m of messages.filter(m => m.to_user === currentUser.id && !m.read_at)) {
       await request('/message/read', { method: 'POST', body: JSON.stringify({ message_id: m.id, user_id: currentUser.id }) });
     }
@@ -906,11 +907,11 @@ app.post('/api/register', async (req, res) => {
   if (!email || !name || !nickname || !password) return res.status(400).json({ error: 'Все поля обязательны' });
   try {
     const hashed = await bcrypt.hash(password, 10);
-    const result = await pool.sql`INSERT INTO users (email, name, nickname, password) VALUES (${email}, ${name}, ${nickname}, ${hashed}) RETURNING id, email, name, nickname`;
+    const result = await pool.query('INSERT INTO users (email, name, nickname, password) VALUES ($1, $2, $3, $4) RETURNING id, email, name, nickname', [email, name, nickname, hashed]);
     // Автоподписка на ru_news
-    const ch = await pool.sql`SELECT id FROM channels WHERE nickname = 'ru_news'`;
+    const ch = await pool.query('SELECT id FROM channels WHERE nickname = $1', ['ru_news']);
     if (ch.rows.length > 0) {
-      await pool.sql`INSERT INTO channel_members (channel_id, user_id) VALUES (${ch.rows[0].id}, ${result.rows[0].id}) ON CONFLICT DO NOTHING`;
+      await pool.query('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [ch.rows[0].id, result.rows[0].id]);
     }
     res.json({ success: true, message: 'Регистрация успешна!', user: result.rows[0] });
   } catch(e) {
@@ -925,7 +926,7 @@ app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' });
   try {
-    const { rows } = await pool.sql`SELECT * FROM users WHERE email = ${email}`;
+    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (!rows[0]) return res.status(400).json({ error: 'Пользователь не найден' });
     const valid = await bcrypt.compare(password, rows[0].password);
     if (!valid) return res.status(400).json({ error: 'Неверный пароль' });
@@ -941,7 +942,7 @@ app.get('/api/me', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const { rows } = await pool.sql`SELECT id, email, name, nickname, photo, birth_date FROM users WHERE id = ${decoded.id}`;
+    const { rows } = await pool.query('SELECT id, email, name, nickname, photo, birth_date FROM users WHERE id = $1', [decoded.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Пользователь не найден' });
     res.json(rows[0]);
   } catch(e) { res.status(401).json({ error: 'Неверный токен' }); }
@@ -954,11 +955,11 @@ app.post('/api/profile/update', async (req, res) => {
   if (!user_id) return res.status(400).json({ error: 'ID обязателен' });
   try {
     if (nickname) {
-      const dup = await pool.sql`SELECT id FROM users WHERE nickname = ${nickname} AND id != ${user_id}`;
+      const dup = await pool.query('SELECT id FROM users WHERE nickname = $1 AND id != $2', [nickname, user_id]);
       if (dup.rows.length > 0) return res.status(400).json({ error: 'Никнейм занят' });
     }
-    await pool.sql`UPDATE users SET name = COALESCE(${name}, name), nickname = COALESCE(${nickname}, nickname), photo = COALESCE(${photo}, photo), birth_date = COALESCE(${birth_date}, birth_date) WHERE id = ${user_id}`;
-    const { rows } = await pool.sql`SELECT id, email, name, nickname, photo, birth_date FROM users WHERE id = ${user_id}`;
+    await pool.query('UPDATE users SET name = COALESCE($1, name), nickname = COALESCE($2, nickname), photo = COALESCE($3, photo), birth_date = COALESCE($4, birth_date) WHERE id = $5', [name, nickname, photo, birth_date, user_id]);
+    const { rows } = await pool.query('SELECT id, email, name, nickname, photo, birth_date FROM users WHERE id = $1', [user_id]);
     res.json({ success: true, user: rows[0] });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -970,7 +971,7 @@ app.get('/api/search/:nickname', async (req, res) => {
   const exclude = parseInt(req.query.exclude) || 0;
   if (!nickname || nickname.trim() === '') return res.json([]);
   try {
-    const { rows } = await pool.sql`SELECT id, name, nickname, photo FROM users WHERE nickname ILIKE ${nickname + '%'} AND id != ${exclude} LIMIT 20`;
+    const { rows } = await pool.query('SELECT id, name, nickname, photo FROM users WHERE nickname ILIKE $1 AND id != $2 LIMIT 20', [nickname + '%', exclude]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -982,8 +983,8 @@ app.post('/api/channel/create', async (req, res) => {
   if (!name || !created_by) return res.status(400).json({ error: 'Название и создатель обязательны' });
   try {
     const inviteCode = is_private ? uuidv4().slice(0,8) : null;
-    const result = await pool.sql`INSERT INTO channels (name, nickname, is_private, invite_code, created_by) VALUES (${name}, ${nickname || null}, ${is_private || false}, ${inviteCode}, ${created_by}) RETURNING id, name, nickname, is_private, invite_code`;
-    await pool.sql`INSERT INTO channel_members (channel_id, user_id) VALUES (${result.rows[0].id}, ${created_by})`;
+    const result = await pool.query('INSERT INTO channels (name, nickname, is_private, invite_code, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, nickname, is_private, invite_code', [name, nickname || null, is_private || false, inviteCode, created_by]);
+    await pool.query('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)', [result.rows[0].id, created_by]);
     res.json({ success: true, channel: result.rows[0], link: is_private ? '/c/join/' + result.rows[0].invite_code : '/c/' + nickname });
   } catch(e) {
     if (e.message?.includes('duplicate')) return res.status(400).json({ error: 'Такой никнейм уже занят' });
@@ -996,15 +997,15 @@ app.post('/api/channel/update', async (req, res) => {
   const { channel_id, user_id, name, nickname, is_private } = req.body;
   if (!channel_id || !user_id) return res.status(400).json({ error: 'Канал и пользователь обязательны' });
   try {
-    const check = await pool.sql`SELECT created_by FROM channels WHERE id = ${channel_id}`;
+    const check = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channel_id]);
     if (!check.rows[0]) return res.status(404).json({ error: 'Канал не найден' });
     if (check.rows[0].created_by !== user_id) return res.status(403).json({ error: 'Только создатель' });
     if (nickname) {
-      const dup = await pool.sql`SELECT id FROM channels WHERE nickname = ${nickname} AND id != ${channel_id}`;
+      const dup = await pool.query('SELECT id FROM channels WHERE nickname = $1 AND id != $2', [nickname, channel_id]);
       if (dup.rows.length > 0) return res.status(400).json({ error: 'Никнейм занят' });
     }
-    await pool.sql`UPDATE channels SET name = COALESCE(${name}, name), nickname = COALESCE(${nickname}, nickname), is_private = COALESCE(${is_private}, is_private) WHERE id = ${channel_id}`;
-    const { rows } = await pool.sql`SELECT * FROM channels WHERE id = ${channel_id}`;
+    await pool.query('UPDATE channels SET name = COALESCE($1, name), nickname = COALESCE($2, nickname), is_private = COALESCE($3, is_private) WHERE id = $4', [name, nickname, is_private, channel_id]);
+    const { rows } = await pool.query('SELECT * FROM channels WHERE id = $1', [channel_id]);
     res.json({ success: true, channel: rows[0] });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1013,7 +1014,7 @@ app.get('/api/channels/:userId', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { userId } = req.params;
   try {
-    const { rows } = await pool.sql`SELECT c.id, c.name, c.nickname, c.is_private, c.created_by, c.created_at, u.name as creator_name FROM channels c JOIN channel_members cm ON c.id = cm.channel_id JOIN users u ON c.created_by = u.id WHERE cm.user_id = ${userId} ORDER BY c.created_at DESC`;
+    const { rows } = await pool.query('SELECT c.id, c.name, c.nickname, c.is_private, c.created_by, c.created_at, u.name as creator_name FROM channels c JOIN channel_members cm ON c.id = cm.channel_id JOIN users u ON c.created_by = u.id WHERE cm.user_id = $1 ORDER BY c.created_at DESC', [userId]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1022,7 +1023,7 @@ app.get('/api/channel/check/:channelId/:userId', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { channelId, userId } = req.params;
   try {
-    const { rows } = await pool.sql`SELECT created_by FROM channels WHERE id = ${channelId}`;
+    const { rows } = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channelId]);
     if (!rows[0]) return res.status(404).json({ error: 'Канал не найден' });
     res.json({ isAdmin: rows[0].created_by === Number(userId) });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1033,11 +1034,10 @@ app.post('/api/channel/message', async (req, res) => {
   const { channel_id, from_user, content, file_url, file_type, is_voice } = req.body;
   if (!channel_id || !from_user) return res.status(400).json({ error: 'Канал и отправитель обязательны' });
   try {
-    const check = await pool.sql`SELECT created_by FROM channels WHERE id = ${channel_id}`;
+    const check = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channel_id]);
     if (!check.rows[0]) return res.status(404).json({ error: 'Канал не найден' });
     if (check.rows[0].created_by !== from_user) return res.status(403).json({ error: 'Только создатель' });
-    await pool.sql`INSERT INTO channel_messages (channel_id, from_user, content, file_url, file_type, is_voice) VALUES (${channel_id}, ${from_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})`;
-    // SSE уведомление
+    await pool.query('INSERT INTO channel_messages (channel_id, from_user, content, file_url, file_type, is_voice) VALUES ($1, $2, $3, $4, $5, $6)', [channel_id, from_user, content || null, file_url || null, file_type || null, is_voice || false]);
     clients.forEach(c => { try { c.res.write('data: ' + JSON.stringify({ type: 'channel_message', channel_id }) + '\\n\\n'); } catch(e) {} });
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1047,7 +1047,7 @@ app.get('/api/channel/messages/:channelId', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { channelId } = req.params;
   try {
-    const { rows } = await pool.sql`SELECT cm.*, u.name as from_name, u.nickname as from_nickname FROM channel_messages cm JOIN users u ON cm.from_user = u.id WHERE cm.channel_id = ${channelId} ORDER BY cm.timestamp ASC`;
+    const { rows } = await pool.query('SELECT cm.*, u.name as from_name, u.nickname as from_nickname FROM channel_messages cm JOIN users u ON cm.from_user = u.id WHERE cm.channel_id = $1 ORDER BY cm.timestamp ASC', [channelId]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1058,7 +1058,7 @@ app.post('/api/message', async (req, res) => {
   const { from_user, to_user, content, file_url, file_type, is_voice } = req.body;
   if (!from_user || !to_user) return res.status(400).json({ error: 'Отправитель и получатель обязательны' });
   try {
-    await pool.sql`INSERT INTO messages (from_user, to_user, content, file_url, file_type, is_voice) VALUES (${from_user}, ${to_user}, ${content || null}, ${file_url || null}, ${file_type || null}, ${is_voice || false})`;
+    await pool.query('INSERT INTO messages (from_user, to_user, content, file_url, file_type, is_voice) VALUES ($1, $2, $3, $4, $5, $6)', [from_user, to_user, content || null, file_url || null, file_type || null, is_voice || false]);
     clients.forEach(c => { try { c.res.write('data: ' + JSON.stringify({ type: 'new_message', to_user, from_user }) + '\\n\\n'); } catch(e) {} });
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1069,7 +1069,7 @@ app.post('/api/message/read', async (req, res) => {
   const { message_id, user_id } = req.body;
   if (!message_id || !user_id) return res.status(400).json({ error: 'ID обязательны' });
   try {
-    await pool.sql`UPDATE messages SET read_at = NOW() WHERE id = ${message_id} AND to_user = ${user_id}`;
+    await pool.query('UPDATE messages SET read_at = NOW() WHERE id = $1 AND to_user = $2', [message_id, user_id]);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1079,7 +1079,7 @@ app.post('/api/upload', async (req, res) => {
   const { from_user, to_user, file_data, file_name, file_type } = req.body;
   if (!from_user || !to_user || !file_data) return res.status(400).json({ error: 'Все поля обязательны' });
   try {
-    await pool.sql`INSERT INTO messages (from_user, to_user, content, file_url, file_type) VALUES (${from_user}, ${to_user}, '📷 Фото', ${file_data}, ${file_type || 'image/jpeg'})`;
+    await pool.query('INSERT INTO messages (from_user, to_user, content, file_url, file_type) VALUES ($1, $2, $3, $4, $5)', [from_user, to_user, '📷 Фото', file_data, file_type || 'image/jpeg']);
     clients.forEach(c => { try { c.res.write('data: ' + JSON.stringify({ type: 'new_message', to_user, from_user }) + '\\n\\n'); } catch(e) {} });
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -1091,7 +1091,7 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
   const id1 = Number(user1), id2 = Number(user2);
   if (isNaN(id1) || isNaN(id2) || id1 <= 0 || id2 <= 0) return res.status(400).json({ error: 'Неверные ID' });
   try {
-    const { rows } = await pool.sql`SELECT m.*, u1.name as from_name, u2.name as to_name FROM messages m LEFT JOIN users u1 ON m.from_user = u1.id LEFT JOIN users u2 ON m.to_user = u2.id WHERE (m.from_user = ${id1} AND m.to_user = ${id2}) OR (m.from_user = ${id2} AND m.to_user = ${id1}) ORDER BY m.timestamp ASC`;
+    const { rows } = await pool.query('SELECT m.*, u1.name as from_name, u2.name as to_name FROM messages m LEFT JOIN users u1 ON m.from_user = u1.id LEFT JOIN users u2 ON m.to_user = u2.id WHERE (m.from_user = $1 AND m.to_user = $2) OR (m.from_user = $2 AND m.to_user = $1) ORDER BY m.timestamp ASC', [id1, id2]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -1102,17 +1102,17 @@ app.get('/api/chats/:userId', async (req, res) => {
   const id = Number(userId);
   if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Неверный ID' });
   try {
-    const { rows } = await pool.sql`
+    const { rows } = await pool.query(`
       SELECT DISTINCT 
-        CASE WHEN m.from_user = ${id} THEN m.to_user ELSE m.from_user END as contact_id,
+        CASE WHEN m.from_user = $1 THEN m.to_user ELSE m.from_user END as contact_id,
         u.name, u.nickname, u.photo,
-        (SELECT content FROM messages m2 WHERE (m2.from_user = ${id} AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = ${id}) ORDER BY m2.timestamp DESC LIMIT 1) as last_message,
-        (SELECT read_at FROM messages m2 WHERE (m2.from_user = ${id} AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = ${id}) ORDER BY m2.timestamp DESC LIMIT 1) as last_message_read
+        (SELECT content FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message,
+        (SELECT read_at FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message_read
       FROM messages m
       JOIN users u ON (u.id = m.from_user OR u.id = m.to_user)
-      WHERE (m.from_user = ${id} OR m.to_user = ${id}) AND u.id != ${id}
+      WHERE (m.from_user = $1 OR m.to_user = $1) AND u.id != $1
       ORDER BY last_message_read DESC
-    `;
+    `, [id]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
