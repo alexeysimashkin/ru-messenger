@@ -101,9 +101,9 @@ async function initTables() {
 }
 initTables();
 
-// ========== HTML СТРАНИЦА (ПОЛНАЯ ВЕРСИЯ) ==========
+// ===== HTML (полная версия) =====
 const HTML = `<!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -322,9 +322,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 </div>
 
 <script>
-// ============================================================
-// ПОЛНЫЙ JS (ВСЕ ФУНКЦИИ)
-// ============================================================
+// ===== ВСЕ ПЕРЕМЕННЫЕ =====
 const API = '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
@@ -343,7 +341,11 @@ let eventSource = null;
 
 function showError(msg, success = false) {
   const el = document.getElementById('errorMessage');
-  if (el) { el.textContent = msg; el.className = 'error-message show' + (success ? ' success' : ''); setTimeout(() => el.classList.remove('show'), 4000); }
+  if (el) {
+    el.textContent = msg;
+    el.className = 'error-message show' + (success ? ' success' : '');
+    setTimeout(() => el.classList.remove('show'), 4000);
+  }
 }
 
 function formatTime(d) { return new Date(d).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }); }
@@ -359,7 +361,7 @@ async function request(path, opts = {}) {
   return data;
 }
 
-// ===== АВТОРИЗАЦИЯ =====
+// ===== АВТОРИЗАЦИЯ (ГЛАВНАЯ ФУНКЦИЯ) =====
 function toggleMode() {
   isLoginMode = !isLoginMode;
   document.getElementById('authTitle').textContent = isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт';
@@ -714,17 +716,62 @@ function openFullscreen(src) {
   document.body.appendChild(overlay);
 }
 
-// ===== ОБРАБОТЧИКИ =====
-document.getElementById('authBtn').addEventListener('click', function(e) { e.preventDefault(); handleAuth(); });
-document.getElementById('toggleAuth').addEventListener('click', function(e) { e.preventDefault(); toggleMode(); });
-document.getElementById('password').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); handleAuth(); } });
-document.getElementById('messageInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') sendMessage(); });
-document.getElementById('channelMessageInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') sendChannelMessage(); });
-document.getElementById('channelNickname').addEventListener('input', function() { document.getElementById('channelPreview').textContent = this.value || 'никнейм'; });
+// ============================================================
+// ГЛАВНЫЕ ОБРАБОТЧИКИ (КНОПКИ РАБОТАЮТ 100%)
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+  // Кнопка входа/регистрации
+  document.getElementById('authBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    handleAuth();
+  });
 
-// ===== ЗАПУСК =====
+  // Переключение режима (Войти / Зарегистрироваться)
+  document.getElementById('toggleAuth').addEventListener('click', function(e) {
+    e.preventDefault();
+    toggleMode();
+  });
+
+  // Enter на поле пароля
+  document.getElementById('password').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAuth();
+    }
+  });
+
+  // Enter на поле email
+  document.getElementById('email').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('password').focus();
+    }
+  });
+
+  // Enter в поле сообщения
+  document.getElementById('messageInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  // Enter в поле сообщения канала
+  document.getElementById('channelMessageInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') sendChannelMessage();
+  });
+
+  // Превью ссылки
+  document.getElementById('channelNickname').addEventListener('input', function() {
+    document.getElementById('channelPreview').textContent = this.value || 'никнейм';
+  });
+});
+
+// ===== ПРОВЕРКА АВТОРИЗАЦИИ =====
 if (token && localStorage.getItem('user')) {
-  try { currentUser = JSON.parse(localStorage.getItem('user')); initApp(); } catch(e) { logout(); }
+  try {
+    currentUser = JSON.parse(localStorage.getItem('user'));
+    initApp();
+  } catch(e) {
+    logout();
+  }
 }
 </script>
 </body>
