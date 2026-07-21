@@ -26,7 +26,7 @@ try {
   console.error('❌ Ошибка БД:', err.message);
 }
 
-// ========== HTML СТРАНИЦА (вся в одном файле) ==========
+// ========== HTML СТРАНИЦА ==========
 const HTML = `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -124,34 +124,22 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 .create-channel-btn:hover{background:#6c5ce7;color:#fff}
 .edit-btn{background:none;border:none;color:#666;font-size:16px;cursor:pointer;padding:4px 8px}
 .edit-btn:hover{color:#6c5ce7}
-.settings-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#1a1a1a;border-radius:12px;margin-bottom:6px}
-.settings-item .left{display:flex;align-items:center;gap:12px}
-.settings-item .left .icon{font-size:18px}
-.settings-item .left .label{color:#fff;font-size:14px}
-.settings-item .right{color:#666;font-size:14px}
-.avatar-upload .avatar-preview{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;font-weight:700;overflow:hidden;cursor:pointer;border:3px solid #2a2a2a;margin:0 auto 10px}
-.avatar-upload .avatar-preview img{width:100%;height:100%;object-fit:cover}
-.avatar-upload .avatar-hint{font-size:12px;color:#666;cursor:pointer;text-align:center}
-.avatar-upload .avatar-hint:hover{color:#6c5ce7}
-.contact-card{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a1a1a;border-radius:12px;margin-bottom:6px}
-.contact-card .avatar-md{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden}
-.contact-card .avatar-md img{width:100%;height:100%;object-fit:cover}
-.contact-card .info .name{color:#fff;font-weight:600;font-size:14px}
-.contact-card .info .nickname{color:#666;font-size:12px}
 .profile-avatar{width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;font-weight:700;margin:0 auto 16px;overflow:hidden;cursor:pointer;border:3px solid #2a2a2a}
 .profile-avatar img{width:100%;height:100%;object-fit:cover}
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="auth-container" id="authContainer">
+
+  <!-- АВТОРИЗАЦИЯ -->
+  <div id="authContainer">
     <div class="logo">
       <div class="logo-icon">RU</div>
       <h1>Мессенджер <span>RU</span></h1>
       <p id="authTitle">Войдите в свой аккаунт</p>
     </div>
     <div id="errorMessage" class="error-message"></div>
-    <form id="authForm" onsubmit="event.preventDefault(); handleAuth()">
+    <form id="authForm">
       <div class="form-group">
         <label>Email</label>
         <input id="email" type="email" placeholder="example@mail.ru" required />
@@ -164,11 +152,12 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <button type="submit" class="btn-primary" id="authBtn">Войти</button>
     </form>
     <div class="auth-toggle">
-      <span id="toggleAuth" onclick="toggleMode()">Зарегистрироваться</span>
+      <span id="toggleAuth">Зарегистрироваться</span>
     </div>
   </div>
 
-  <div class="app-container" id="appContainer">
+  <!-- ПРИЛОЖЕНИЕ -->
+  <div id="appContainer" style="display:none;flex-direction:column;gap:16px;">
     <div class="user-info">
       <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="switchTab('profile')">
         <div class="avatar" id="topAvatar">U</div>
@@ -180,7 +169,6 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <button class="logout-btn" onclick="logout()">⏻</button>
     </div>
 
-    <!-- Вкладки -->
     <div class="bottom-tabs">
       <button data-tab="chats" class="active" onclick="switchTab('chats')"><span class="tab-icon">💬</span>Чаты</button>
       <button data-tab="contacts" onclick="switchTab('contacts')"><span class="tab-icon">👤</span>Контакты</button>
@@ -188,7 +176,6 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <button data-tab="profile" onclick="switchTab('profile')"><span class="tab-icon">👤</span>Профиль</button>
     </div>
 
-    <!-- Чаты -->
     <div id="tab-chats" class="tab-content active">
       <div id="contactsView">
         <div class="search-row">
@@ -216,11 +203,10 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
             <div class="menu-item" onclick="alert('Скоро!')">📄 Документ</div>
           </div>
         </div>
-        <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="handleFileSelect(event)" />
+        <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" />
       </div>
     </div>
 
-    <!-- Контакты -->
     <div id="tab-contacts" class="tab-content">
       <div class="search-row">
         <input id="contactsSearch" placeholder="🔍 Поиск контактов..." oninput="filterContacts(this.value)" />
@@ -228,7 +214,6 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <div id="contactsListTab"></div>
     </div>
 
-    <!-- Каналы -->
     <div id="tab-channels" class="tab-content">
       <div id="channelListView">
         <button class="create-channel-btn" onclick="showCreateChannelModal()">➕ Создать канал</button>
@@ -251,12 +236,11 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       </div>
     </div>
 
-    <!-- Профиль -->
     <div id="tab-profile" class="tab-content">
       <div style="text-align:center;padding:10px 0;">
-        <div class="profile-avatar" id="profileAvatar" onclick="document.getElementById('profilePhotoInput').click()">U</div>
-        <div class="avatar-hint" onclick="document.getElementById('profilePhotoInput').click()">Нажмите, чтобы изменить фото</div>
-        <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" onchange="updateProfilePhoto(event)" />
+        <div class="profile-avatar" id="profileAvatar">U</div>
+        <div class="avatar-hint" onclick="document.getElementById('profilePhotoInput').click()" style="font-size:12px;color:#666;cursor:pointer;text-align:center;">Нажмите, чтобы изменить фото</div>
+        <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" />
         <div class="form-group" style="margin-top:16px;">
           <label>Имя</label>
           <input id="profileName" placeholder="Ваше имя" />
@@ -273,9 +257,10 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       </div>
     </div>
   </div>
+
 </div>
 
-<!-- Модалки -->
+<!-- МОДАЛКИ -->
 <div class="modal-overlay" id="createChannelModal">
   <div class="modal-content">
     <h3>📢 Создать канал</h3>
@@ -299,6 +284,9 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 </div>
 
 <script>
+// ============================================================
+// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ============================================================
 const API = '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
@@ -315,7 +303,9 @@ let mediaRecorder = null;
 let audioChunks = [];
 let eventSource = null;
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ==========
+// ============================================================
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================
 function showError(msg, success = false) {
   const el = document.getElementById('errorMessage');
   if (el) {
@@ -325,12 +315,17 @@ function showError(msg, success = false) {
   }
 }
 
-function formatTime(d) { return new Date(d).toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}); }
+function formatTime(d) {
+  return new Date(d).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+}
 
 async function request(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(API + path, { ...opts, headers: { ...headers, ...opts.headers } });
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { ...headers, ...opts.headers }
+  });
   const text = await res.text();
   if (!text) throw new Error('Пустой ответ');
   const data = JSON.parse(text);
@@ -338,43 +333,63 @@ async function request(path, opts = {}) {
   return data;
 }
 
-// ========== АВТОРИЗАЦИЯ ==========
+// ============================================================
+// АВТОРИЗАЦИЯ (100% РАБОТАЕТ)
+// ============================================================
 function toggleMode() {
   isLoginMode = !isLoginMode;
   document.getElementById('authTitle').textContent = isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт';
   document.getElementById('authBtn').textContent = isLoginMode ? 'Войти' : 'Создать аккаунт';
   document.getElementById('toggleAuth').textContent = isLoginMode ? 'Зарегистрироваться' : 'Войти';
   document.getElementById('extraFields').innerHTML = isLoginMode ? '' : 
-    '<div class="form-group"><label>Имя</label><input id="name" placeholder="Ваше имя" /></div><div class="form-group"><label>Никнейм</label><input id="nickname" placeholder="Ваш никнейм" /></div>';
+    '<div class="form-group"><label>Имя</label><input id="name" placeholder="Ваше имя" /></div>' +
+    '<div class="form-group"><label>Никнейм</label><input id="nickname" placeholder="Ваш никнейм" /></div>';
 }
 
-async function handleAuth() {
+async function handleAuth(e) {
+  e.preventDefault();
+  
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  if (!email || !password) return showError('Заполните все поля');
   
-  if (isLoginMode) {
-    try {
-      const data = await request('/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  if (!email || !password) {
+    showError('Заполните все поля');
+    return;
+  }
+
+  try {
+    if (isLoginMode) {
+      // ВХОД
+      const data = await request('/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password })
+      });
       token = data.token;
       currentUser = data.user;
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(currentUser));
       initApp();
-    } catch(e) { showError(e.message); }
-  } else {
-    const name = document.getElementById('name').value.trim();
-    const nickname = document.getElementById('nickname').value.trim();
-    if (!name || !nickname) return showError('Заполните все поля');
-    try {
-      const data = await request('/register', { method: 'POST', body: JSON.stringify({ email, name, nickname, password }) });
+    } else {
+      // РЕГИСТРАЦИЯ
+      const name = document.getElementById('name').value.trim();
+      const nickname = document.getElementById('nickname').value.trim();
+      if (!name || !nickname) {
+        showError('Заполните все поля');
+        return;
+      }
+      const data = await request('/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, name, nickname, password })
+      });
       if (data.success) {
         showError('✅ Регистрация успешна! Теперь войдите.', true);
         isLoginMode = true;
         toggleMode();
         document.getElementById('email').value = email;
       }
-    } catch(e) { showError(e.message); }
+    }
+  } catch (err) {
+    showError(err.message);
   }
 }
 
@@ -388,7 +403,9 @@ function logout() {
   document.getElementById('appContainer').style.display = 'none';
 }
 
-// ========== SSE ==========
+// ============================================================
+// SSE
+// ============================================================
 function connectSSE() {
   if (eventSource) { eventSource.close(); }
   eventSource = new EventSource(API + '/events');
@@ -404,10 +421,15 @@ function connectSSE() {
       }
     } catch(err) {}
   };
-  eventSource.onerror = () => { eventSource.close(); setTimeout(connectSSE, 5000); };
+  eventSource.onerror = () => {
+    eventSource.close();
+    setTimeout(connectSSE, 5000);
+  };
 }
 
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
+// ============================================================
+// ИНИЦИАЛИЗАЦИЯ
+// ============================================================
 function initApp() {
   document.getElementById('authContainer').style.display = 'none';
   document.getElementById('appContainer').style.display = 'flex';
@@ -423,7 +445,9 @@ function initApp() {
   loadProfile();
 }
 
-// ========== ВКЛАДКИ ==========
+// ============================================================
+// ВКЛАДКИ
+// ============================================================
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.bottom-tabs button').forEach(el => el.classList.remove('active'));
@@ -435,7 +459,9 @@ function switchTab(tab) {
   else if (tab === 'profile') loadProfile();
 }
 
-// ========== ЧАТЫ ==========
+// ============================================================
+// ЧАТЫ
+// ============================================================
 async function loadChats() {
   try {
     const data = await request('/chats/' + currentUser.id);
@@ -539,7 +565,9 @@ async function sendMessage() {
   } catch(e) { showError(e.message); }
 }
 
-// ========== КОНТАКТЫ ==========
+// ============================================================
+// КОНТАКТЫ
+// ============================================================
 async function loadContacts() {
   try {
     const data = await request('/search/?exclude=' + currentUser.id);
@@ -589,7 +617,9 @@ function openChatFromContact(id) {
   }
 }
 
-// ========== КАНАЛЫ ==========
+// ============================================================
+// КАНАЛЫ
+// ============================================================
 async function loadChannels() {
   try {
     const data = await request('/channels/' + currentUser.id);
@@ -681,7 +711,9 @@ async function sendChannelMessage() {
   } catch(e) { showError(e.message); }
 }
 
-// ========== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА ==========
+// ============================================================
+// КАНАЛЫ — СОЗДАНИЕ / РЕДАКТИРОВАНИЕ
+// ============================================================
 function showCreateChannelModal() { document.getElementById('createChannelModal').classList.add('active'); }
 function closeCreateChannelModal() { document.getElementById('createChannelModal').classList.remove('active'); }
 function showEditChannelModal() { 
@@ -730,10 +762,10 @@ async function saveChannelChanges() {
   } catch(e) { showError(e.message); }
 }
 
-// ========== ПРОФИЛЬ ==========
+// ============================================================
+// ПРОФИЛЬ
+// ============================================================
 function loadProfile() {
-  const container = document.getElementById('tab-profile');
-  if (!container) return;
   document.getElementById('profileName').value = currentUser.name || '';
   document.getElementById('profileNickname').value = currentUser.nickname || '';
   document.getElementById('profileBirthDate').value = currentUser.birth_date || '';
@@ -745,7 +777,7 @@ function loadProfile() {
   }
 }
 
-async function updateProfilePhoto(e) {
+document.getElementById('profilePhotoInput').addEventListener('change', async function(e) {
   const file = e.target.files[0];
   if (!file) return;
   if (file.size > 2*1024*1024) return showError('Файл > 2MB');
@@ -765,7 +797,7 @@ async function updateProfilePhoto(e) {
     reader.readAsDataURL(file);
   } catch(e) { showError(e.message); }
   e.target.value = '';
-}
+});
 
 async function saveProfile() {
   const name = document.getElementById('profileName').value.trim();
@@ -785,13 +817,15 @@ async function saveProfile() {
   } catch(e) { showError(e.message); }
 }
 
-// ========== ФОТО ==========
+// ============================================================
+// ФОТО
+// ============================================================
 function triggerFileUpload() {
   document.getElementById('fileInput').click();
   document.getElementById('attachMenu').style.display = 'none';
 }
 
-async function handleFileSelect(e) {
+document.getElementById('fileInput').addEventListener('change', async function(e) {
   const file = e.target.files[0];
   if (!file || !selectedUser) { e.target.value = ''; return; }
   if (file.size > 5*1024*1024) return showError('Файл > 5MB');
@@ -805,9 +839,11 @@ async function handleFileSelect(e) {
     reader.readAsDataURL(file);
   } catch(e) { showError(e.message); }
   e.target.value = '';
-}
+});
 
-// ========== ГОЛОСОВЫЕ ==========
+// ============================================================
+// ГОЛОСОВЫЕ
+// ============================================================
 function toggleVoiceRecord() {
   if (isRecording) { stopRecording(); } else { startRecording(); }
 }
@@ -844,13 +880,17 @@ function stopRecording() {
   if (mediaRecorder && isRecording) { mediaRecorder.stop(); }
 }
 
-// ========== МЕНЮ ==========
+// ============================================================
+// МЕНЮ
+// ============================================================
 function toggleAttachMenu() {
   const menu = document.getElementById('attachMenu');
   menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
 }
 
-// ========== ПОЛНОЭКРАННОЕ ФОТО ==========
+// ============================================================
+// ПОЛНОЭКРАННОЕ ФОТО
+// ============================================================
 function openFullscreen(src) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;justify-content:center;align-items:center;cursor:pointer;';
@@ -859,7 +899,28 @@ function openFullscreen(src) {
   document.body.appendChild(overlay);
 }
 
-// ========== ЗАПУСК ==========
+// ============================================================
+// ОБРАБОТЧИКИ СОБЫТИЙ
+// ============================================================
+document.getElementById('authForm').addEventListener('submit', handleAuth);
+
+document.getElementById('toggleAuth').addEventListener('click', toggleMode);
+
+document.getElementById('messageInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') sendMessage();
+});
+
+document.getElementById('channelMessageInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') sendChannelMessage();
+});
+
+document.getElementById('channelNickname').addEventListener('input', function() {
+  document.getElementById('channelPreview').textContent = this.value || 'никнейм';
+});
+
+// ============================================================
+// ПРОВЕРКА АВТОРИЗАЦИИ ПРИ ЗАГРУЗКЕ
+// ============================================================
 if (token && localStorage.getItem('user')) {
   try {
     currentUser = JSON.parse(localStorage.getItem('user'));
@@ -868,24 +929,11 @@ if (token && localStorage.getItem('user')) {
     logout();
   }
 }
-
-// Превью никнейма
-document.getElementById('channelNickname')?.addEventListener('input', function() {
-  document.getElementById('channelPreview').textContent = this.value || 'никнейм';
-});
-
-// Enter для сообщений
-document.getElementById('messageInput')?.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') sendMessage();
-});
-document.getElementById('channelMessageInput')?.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') sendChannelMessage();
-});
 </script>
 </body>
 </html>`;
 
-// ========== ГЛАВНАЯ СТРАНИЦА ==========
+// ========== ГЛАВНАЯ ==========
 app.get('/', (req, res) => {
   res.send(HTML);
 });
@@ -895,7 +943,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), postgres: !!pool });
 });
 
-// ========== API ==========
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), postgres: !!pool });
 });
@@ -908,7 +955,6 @@ app.post('/api/register', async (req, res) => {
   try {
     const hashed = await bcrypt.hash(password, 10);
     const result = await pool.query('INSERT INTO users (email, name, nickname, password) VALUES ($1, $2, $3, $4) RETURNING id, email, name, nickname', [email, name, nickname, hashed]);
-    // Автоподписка на ru_news
     const ch = await pool.query('SELECT id FROM channels WHERE nickname = $1', ['ru_news']);
     if (ch.rows.length > 0) {
       await pool.query('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [ch.rows[0].id, result.rows[0].id]);
