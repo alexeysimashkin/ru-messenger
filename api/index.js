@@ -26,73 +26,17 @@ try {
   console.error('❌ Ошибка БД:', err.message);
 }
 
-// ===== АВТОМАТИЧЕСКОЕ СОЗДАНИЕ ТАБЛИЦ =====
 async function initTables() {
   if (!pool) return;
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        email TEXT UNIQUE NOT NULL,
-        name TEXT NOT NULL,
-        nickname TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        photo TEXT,
-        birth_date TEXT,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        to_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        content TEXT,
-        file_url TEXT,
-        file_type TEXT,
-        is_voice BOOLEAN DEFAULT FALSE,
-        read_at TIMESTAMP,
-        timestamp TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS channels (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        nickname TEXT UNIQUE,
-        is_private BOOLEAN DEFAULT FALSE,
-        invite_code TEXT UNIQUE,
-        created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS channel_members (
-        id SERIAL PRIMARY KEY,
-        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
-        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        joined_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(channel_id, user_id)
-      )
-    `);
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS channel_messages (
-        id SERIAL PRIMARY KEY,
-        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
-        from_user INTEGER REFERENCES users(id) ON DELETE CASCADE,
-        content TEXT,
-        file_url TEXT,
-        file_type TEXT,
-        is_voice BOOLEAN DEFAULT FALSE,
-        timestamp TIMESTAMP DEFAULT NOW()
-      )
-    `);
+    await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, nickname TEXT UNIQUE NOT NULL, password TEXT NOT NULL, photo TEXT, birth_date TEXT, created_at TIMESTAMP DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, from_user INTEGER REFERENCES users(id) ON DELETE CASCADE, to_user INTEGER REFERENCES users(id) ON DELETE CASCADE, content TEXT, file_url TEXT, file_type TEXT, is_voice BOOLEAN DEFAULT FALSE, read_at TIMESTAMP, timestamp TIMESTAMP DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, name TEXT NOT NULL, nickname TEXT UNIQUE, is_private BOOLEAN DEFAULT FALSE, invite_code TEXT UNIQUE, created_by INTEGER REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMP DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS channel_members (id SERIAL PRIMARY KEY, channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, joined_at TIMESTAMP DEFAULT NOW(), UNIQUE(channel_id, user_id))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS channel_messages (id SERIAL PRIMARY KEY, channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE, from_user INTEGER REFERENCES users(id) ON DELETE CASCADE, content TEXT, file_url TEXT, file_type TEXT, is_voice BOOLEAN DEFAULT FALSE, timestamp TIMESTAMP DEFAULT NOW())`);
     const ch = await pool.query('SELECT id FROM channels WHERE nickname = $1', ['ru_news']);
     if (ch.rows.length === 0) {
-      await pool.query(
-        'INSERT INTO channels (name, nickname, is_private, created_by) VALUES ($1, $2, $3, $4)',
-        ['RU Новости', 'ru_news', false, 1]
-      );
+      await pool.query('INSERT INTO channels (name, nickname, is_private, created_by) VALUES ($1, $2, $3, $4)', ['RU Новости', 'ru_news', false, 1]);
     }
     console.log('✅ Все таблицы созданы');
   } catch (err) {
@@ -101,7 +45,7 @@ async function initTables() {
 }
 initTables();
 
-// ===== HTML (полная версия) =====
+// ===== HTML (кнопки через onclick, ГАРАНТИРОВАННО РАБОТАЮТ) =====
 const HTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -148,7 +92,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 .chat-header .back{background:none;border:none;font-size:22px;cursor:pointer;color:#6c5ce7}
 .chat-header .name{color:#fff;font-weight:600;font-size:15px}
 .chat-header .sub{color:#666;font-size:12px}
-.messages-container{max-height:300px;overflow-y:auto;padding:8px 0;scroll-behavior:smooth}
+.messages-container{max-height:300px;overflow-y:auto;padding:8px 0}
 .message{padding:8px 12px;margin:3px 0;border-radius:12px;max-width:80%;word-wrap:break-word}
 .message.my{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;margin-left:auto;border-bottom-right-radius:3px}
 .message.other{background:#1a1a1a;color:#ddd;border-bottom-left-radius:3px}
@@ -222,8 +166,8 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
   <div class="form-group"><label>Email</label><input id="email" type="email" placeholder="example@mail.ru" /></div>
   <div id="extraFields"></div>
   <div class="form-group"><label>Пароль</label><input id="password" type="password" placeholder="Введите пароль" /></div>
-  <button class="btn-primary" id="authBtn">Войти</button>
-  <div class="auth-toggle"><span id="toggleAuth">Зарегистрироваться</span></div>
+  <button class="btn-primary" id="authBtn" onclick="handleAuth()">Войти</button>
+  <div class="auth-toggle"><span id="toggleAuth" onclick="toggleMode()">Зарегистрироваться</span></div>
 </div>
 
 <!-- ПРИЛОЖЕНИЕ -->
@@ -259,7 +203,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
         <button class="icon-btn" id="attachBtn" onclick="toggleAttachMenu()">📎</button>
         <div id="attachMenu"><div class="menu-item" onclick="triggerFileUpload()">🖼️ Фото</div></div>
       </div>
-      <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" />
+      <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="handleFileSelect(event)" />
     </div>
   </div>
 
@@ -289,7 +233,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
     <div style="text-align:center;padding:10px 0;">
       <div class="profile-avatar" id="profileAvatar" onclick="document.getElementById('profilePhotoInput').click()">U</div>
       <div class="avatar-hint" onclick="document.getElementById('profilePhotoInput').click()" style="font-size:12px;color:#666;cursor:pointer;text-align:center;">Нажмите, чтобы изменить фото</div>
-      <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" />
+      <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" onchange="updateProfilePhoto(event)" />
       <div class="form-group" style="margin-top:16px;"><label>Имя</label><input id="profileName" placeholder="Ваше имя" /></div>
       <div class="form-group"><label>Никнейм</label><input id="profileNickname" placeholder="Ваш никнейм" /></div>
       <div class="form-group"><label>Дата рождения</label><input id="profileBirthDate" type="date" /></div>
@@ -322,7 +266,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 </div>
 
 <script>
-// ===== ВСЕ ПЕРЕМЕННЫЕ =====
+// ===== ВСЕ ФУНКЦИИ ГЛОБАЛЬНЫЕ (для onclick) =====
 const API = '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
@@ -361,7 +305,7 @@ async function request(path, opts = {}) {
   return data;
 }
 
-// ===== АВТОРИЗАЦИЯ (ГЛАВНАЯ ФУНКЦИЯ) =====
+// ===== АВТОРИЗАЦИЯ =====
 function toggleMode() {
   isLoginMode = !isLoginMode;
   document.getElementById('authTitle').textContent = isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт';
@@ -410,7 +354,6 @@ function initApp() {
   loadProfile();
 }
 
-// ===== SSE =====
 function connectSSE() {
   if (eventSource) { eventSource.close(); }
   eventSource = new EventSource(API + '/events');
@@ -626,8 +569,8 @@ function loadProfile() {
   if (currentUser.photo) { avatar.innerHTML = '<img src="' + currentUser.photo + '" />'; } else { avatar.textContent = currentUser.name.charAt(0).toUpperCase(); }
 }
 
-document.getElementById('profilePhotoInput').addEventListener('change', async function(e) {
-  const file = e.target.files[0];
+async function updateProfilePhoto(event) {
+  const file = event.target.files[0];
   if (!file) return;
   if (file.size > 2*1024*1024) return showError('Файл > 2MB');
   if (!file.type.startsWith('image/')) return showError('Только изображения');
@@ -639,8 +582,8 @@ document.getElementById('profilePhotoInput').addEventListener('change', async fu
     };
     reader.readAsDataURL(file);
   } catch(e) { showError(e.message); }
-  e.target.value = '';
-});
+  event.target.value = '';
+}
 
 async function saveProfile() {
   const name = document.getElementById('profileName').value.trim();
@@ -653,9 +596,9 @@ async function saveProfile() {
 // ===== ФОТО =====
 function triggerFileUpload() { document.getElementById('fileInput').click(); document.getElementById('attachMenu').style.display = 'none'; }
 
-document.getElementById('fileInput').addEventListener('change', async function(e) {
-  const file = e.target.files[0];
-  if (!file || !selectedUser) { e.target.value = ''; return; }
+async function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file || !selectedUser) { event.target.value = ''; return; }
   if (file.size > 5*1024*1024) return showError('Файл > 5MB');
   if (!file.type.startsWith('image/')) return showError('Только изображения');
   try {
@@ -666,8 +609,8 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     };
     reader.readAsDataURL(file);
   } catch(e) { showError(e.message); }
-  e.target.value = '';
-});
+  event.target.value = '';
+}
 
 // ===== ГОЛОСОВЫЕ =====
 function toggleVoiceRecord() {
@@ -704,10 +647,8 @@ async function startRecording() {
 
 function stopRecording() { if (mediaRecorder && isRecording) { mediaRecorder.stop(); } }
 
-// ===== МЕНЮ =====
 function toggleAttachMenu() { const menu = document.getElementById('attachMenu'); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; }
 
-// ===== ПОЛНОЭКРАННОЕ ФОТО =====
 function openFullscreen(src) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;justify-content:center;align-items:center;cursor:pointer;';
@@ -716,53 +657,11 @@ function openFullscreen(src) {
   document.body.appendChild(overlay);
 }
 
-// ============================================================
-// ГЛАВНЫЕ ОБРАБОТЧИКИ (КНОПКИ РАБОТАЮТ 100%)
-// ============================================================
-document.addEventListener('DOMContentLoaded', function() {
-  // Кнопка входа/регистрации
-  document.getElementById('authBtn').addEventListener('click', function(e) {
-    e.preventDefault();
-    handleAuth();
-  });
-
-  // Переключение режима (Войти / Зарегистрироваться)
-  document.getElementById('toggleAuth').addEventListener('click', function(e) {
-    e.preventDefault();
-    toggleMode();
-  });
-
-  // Enter на поле пароля
-  document.getElementById('password').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAuth();
-    }
-  });
-
-  // Enter на поле email
-  document.getElementById('email').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      document.getElementById('password').focus();
-    }
-  });
-
-  // Enter в поле сообщения
-  document.getElementById('messageInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') sendMessage();
-  });
-
-  // Enter в поле сообщения канала
-  document.getElementById('channelMessageInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') sendChannelMessage();
-  });
-
-  // Превью ссылки
-  document.getElementById('channelNickname').addEventListener('input', function() {
-    document.getElementById('channelPreview').textContent = this.value || 'никнейм';
-  });
-});
+// Enter
+document.getElementById('messageInput')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendMessage(); });
+document.getElementById('channelMessageInput')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendChannelMessage(); });
+document.getElementById('password')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') handleAuth(); });
+document.getElementById('channelNickname')?.addEventListener('input', function() { document.getElementById('channelPreview').textContent = this.value || 'никнейм'; });
 
 // ===== ПРОВЕРКА АВТОРИЗАЦИИ =====
 if (token && localStorage.getItem('user')) {
@@ -788,10 +687,7 @@ app.post('/api/register', async (req, res) => {
   if (!email || !name || !nickname || !password) return res.status(400).json({ error: 'Все поля обязательны' });
   try {
     const hashed = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      'INSERT INTO users (email, name, nickname, password) VALUES ($1, $2, $3, $4) RETURNING id, email, name, nickname',
-      [email, name, nickname, hashed]
-    );
+    const result = await pool.query('INSERT INTO users (email, name, nickname, password) VALUES ($1, $2, $3, $4) RETURNING id, email, name, nickname', [email, name, nickname, hashed]);
     const ch = await pool.query('SELECT id FROM channels WHERE nickname = $1', ['ru_news']);
     if (ch.rows.length > 0) {
       await pool.query('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [ch.rows[0].id, result.rows[0].id]);
@@ -818,7 +714,7 @@ app.post('/api/login', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ========== ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ ==========
+// ========== ВСЕ ОСТАЛЬНЫЕ API ==========
 app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Нет токена' });
@@ -831,7 +727,6 @@ app.get('/api/me', async (req, res) => {
   } catch(e) { res.status(401).json({ error: 'Неверный токен' }); }
 });
 
-// ========== ОБНОВЛЕНИЕ ПРОФИЛЯ ==========
 app.post('/api/profile/update', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { user_id, name, nickname, photo, birth_date } = req.body;
@@ -847,7 +742,6 @@ app.post('/api/profile/update', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ========== ПОИСК ПОЛЬЗОВАТЕЛЕЙ ==========
 app.get('/api/search/:nickname', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { nickname } = req.params;
@@ -859,7 +753,6 @@ app.get('/api/search/:nickname', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ========== КАНАЛЫ ==========
 app.post('/api/channel/create', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { name, nickname, is_private, created_by } = req.body;
@@ -935,7 +828,6 @@ app.get('/api/channel/messages/:channelId', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ========== ЛИЧНЫЕ СООБЩЕНИЯ ==========
 app.post('/api/message', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { from_user, to_user, content, file_url, file_type, is_voice } = req.body;
@@ -985,22 +877,11 @@ app.get('/api/chats/:userId', async (req, res) => {
   const id = Number(userId);
   if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Неверный ID' });
   try {
-    const { rows } = await pool.query(`
-      SELECT DISTINCT 
-        CASE WHEN m.from_user = $1 THEN m.to_user ELSE m.from_user END as contact_id,
-        u.name, u.nickname, u.photo,
-        (SELECT content FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message,
-        (SELECT read_at FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message_read
-      FROM messages m
-      JOIN users u ON (u.id = m.from_user OR u.id = m.to_user)
-      WHERE (m.from_user = $1 OR m.to_user = $1) AND u.id != $1
-      ORDER BY last_message_read DESC
-    `, [id]);
+    const { rows } = await pool.query(`SELECT DISTINCT CASE WHEN m.from_user = $1 THEN m.to_user ELSE m.from_user END as contact_id, u.name, u.nickname, u.photo, (SELECT content FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message, (SELECT read_at FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message_read FROM messages m JOIN users u ON (u.id = m.from_user OR u.id = m.to_user) WHERE (m.from_user = $1 OR m.to_user = $1) AND u.id != $1 ORDER BY last_message_read DESC`, [id]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ========== SSE ==========
 app.get('/api/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1009,14 +890,8 @@ app.get('/api/events', (req, res) => {
   const client = { id: Date.now(), res };
   clients.push(client);
   const ping = setInterval(() => { try { res.write(': ping\\n\\n'); } catch(e) { clearInterval(ping); } }, 30000);
-  req.on('close', () => {
-    clearInterval(ping);
-    clients = clients.filter(c => c.id !== client.id);
-  });
+  req.on('close', () => { clearInterval(ping); clients = clients.filter(c => c.id !== client.id); });
 });
 
-// ========== ПОРТ ==========
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log('✅ Сервер запущен на порту ' + PORT);
-});
+app.listen(PORT, () => { console.log('✅ Сервер запущен на порту ' + PORT); });
