@@ -46,7 +46,7 @@ async function initTables() {
 initTables();
 
 // ============================================================
-// HTML СТРАНИЦА (упрощённая для теста кнопок)
+// HTML (ПОЛНАЯ ВЕРСИЯ СО ВСЕМИ ФУНКЦИЯМИ)
 // ============================================================
 const HTML = `<!DOCTYPE html>
 <html>
@@ -172,28 +172,120 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
   <div class="auth-toggle"><span id="toggleAuth">Зарегистрироваться</span></div>
 </div>
 
-<!-- ПРИЛОЖЕНИЕ (упрощённое для теста) -->
+<!-- ПРИЛОЖЕНИЕ -->
 <div id="appContainer" style="display:none;flex-direction:column;gap:16px;">
   <div class="user-info">
-    <div><div class="name" id="topName">User</div><div class="nickname" id="topNickname">@user</div></div>
+    <div style="display:flex;align-items:center;gap:10px;cursor:pointer" id="profileTabBtn">
+      <div class="avatar" id="topAvatar">U</div>
+      <div><div class="name" id="topName">User</div><div class="nickname" id="topNickname">@user</div></div>
+    </div>
     <button class="logout-btn" id="logoutBtn">⏻</button>
   </div>
-  <div style="color:#fff;text-align:center;padding:20px 0;">
-    <h2>Добро пожаловать!</h2>
-    <p id="welcomeMsg" style="color:#888;margin-top:8px;"></p>
+
+  <div class="bottom-tabs">
+    <button data-tab="chats" class="active" id="tabChatsBtn">💬 Чаты</button>
+    <button data-tab="contacts" id="tabContactsBtn">👤 Контакты</button>
+    <button data-tab="channels" id="tabChannelsBtn">📢 Каналы</button>
+    <button data-tab="profile" id="tabProfileBtn">👤 Профиль</button>
+  </div>
+
+  <!-- ЧАТЫ -->
+  <div id="tab-chats" class="tab-content active">
+    <div id="contactsView">
+      <div class="search-row"><input id="searchInput" placeholder="🔍 Поиск по никнейму..." /><button id="searchBtn">Найти</button></div>
+      <div id="contactsList"></div>
+    </div>
+    <div id="chatView" style="display:none;">
+      <div class="chat-header"><button class="back" id="backToChatsBtn">←</button><div><div class="name" id="selectedChatName"></div><div class="sub" id="selectedChatSub"></div></div></div>
+      <div class="messages-container" id="messagesList"></div>
+      <div class="input-container">
+        <input id="messageInput" placeholder="Сообщение..." />
+        <button id="sendMsgBtn">Отправить</button>
+        <button class="icon-btn" id="voiceBtn">🎤</button>
+        <button class="icon-btn" id="attachBtn">📎</button>
+        <div id="attachMenu"><div class="menu-item" id="photoUploadBtn">🖼️ Фото</div></div>
+      </div>
+      <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" />
+    </div>
+  </div>
+
+  <!-- КОНТАКТЫ -->
+  <div id="tab-contacts" class="tab-content">
+    <div class="search-row"><input id="contactsSearch" placeholder="🔍 Поиск контактов..." /></div>
+    <div id="contactsListTab"></div>
+  </div>
+
+  <!-- КАНАЛЫ -->
+  <div id="tab-channels" class="tab-content">
+    <div id="channelListView">
+      <button class="create-channel-btn" id="createChannelBtn">➕ Создать канал</button>
+      <div id="channelsList"></div>
+    </div>
+    <div id="channelChatView" style="display:none;">
+      <div class="chat-header"><button class="back" id="backToChannelsBtn">←</button><div><div class="name" id="selectedChannelName"></div><div class="sub" id="selectedChannelSub"></div></div><button class="edit-btn" id="channelEditBtn" style="display:none;">✏️</button></div>
+      <div class="messages-container" id="channelMessagesList"></div>
+      <div class="input-container" id="channelInputContainer" style="display:none;">
+        <input id="channelMessageInput" placeholder="Сообщение в канал..." /><button id="sendChannelMsgBtn">Отправить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ПРОФИЛЬ -->
+  <div id="tab-profile" class="tab-content">
+    <div style="text-align:center;padding:10px 0;">
+      <div class="profile-avatar" id="profileAvatar">U</div>
+      <div class="avatar-hint" id="changePhotoHint" style="font-size:12px;color:#666;cursor:pointer;text-align:center;">Нажмите, чтобы изменить фото</div>
+      <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" />
+      <div class="form-group" style="margin-top:16px;"><label>Имя</label><input id="profileName" placeholder="Ваше имя" /></div>
+      <div class="form-group"><label>Никнейм</label><input id="profileNickname" placeholder="Ваш никнейм" /></div>
+      <div class="form-group"><label>Дата рождения</label><input id="profileBirthDate" type="date" /></div>
+      <button class="btn-primary" id="saveProfileBtn">💾 Сохранить</button>
+    </div>
   </div>
 </div>
 
+<!-- МОДАЛКИ -->
+<div class="modal-overlay" id="createChannelModal">
+  <div class="modal-content">
+    <h3>📢 Создать канал</h3>
+    <div class="form-group"><label>Название *</label><input id="channelName" placeholder="Мой канал" /></div>
+    <div class="form-group"><label>Никнейм</label><input id="channelNickname" placeholder="my-channel" /><div class="hint">ru-mes.vercel.app/c/<span id="channelPreview">никнейм</span></div></div>
+    <div class="form-group checkbox"><input type="checkbox" id="channelPrivate" /><label>Приватный</label></div>
+    <button class="btn-primary" id="createChannelSubmitBtn">Создать</button>
+    <button class="btn-secondary" id="closeCreateChannelBtn">Отмена</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editChannelModal">
+  <div class="modal-content">
+    <h3>✏️ Редактировать канал</h3>
+    <div class="form-group"><label>Название</label><input id="editChannelName" placeholder="Название" /></div>
+    <div class="form-group"><label>Никнейм</label><input id="editChannelNickname" placeholder="my-channel" /></div>
+    <div class="form-group checkbox"><input type="checkbox" id="editChannelPrivate" /><label>Приватный</label></div>
+    <button class="btn-primary" id="saveChannelChangesBtn">💾 Сохранить</button>
+    <button class="btn-secondary" id="closeEditChannelBtn">Отмена</button>
+  </div>
 </div>
 
 <script>
 // ============================================================
-// 100% РАБОЧИЙ JS (всё через addEventListener)
+// ПОЛНАЯ ЛОГИКА (ВСЁ ЧЕРЕЗ addEventListener)
 // ============================================================
 const API = '/api';
 let token = localStorage.getItem('token');
 let currentUser = null;
+let selectedUser = null;
+let selectedChannel = null;
+let contacts = [];
+let channels = [];
+let messages = [];
+let channelMessages = [];
+let allUsers = [];
 let isLoginMode = true;
+let isRecording = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let eventSource = null;
 
 function showError(msg, success = false) {
   const el = document.getElementById('errorMessage');
@@ -203,6 +295,8 @@ function showError(msg, success = false) {
     setTimeout(() => el.classList.remove('show'), 4000);
   }
 }
+
+function formatTime(d) { return new Date(d).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' }); }
 
 async function request(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
@@ -215,6 +309,7 @@ async function request(path, opts = {}) {
   return data;
 }
 
+// ===== АВТОРИЗАЦИЯ =====
 function toggleMode() {
   isLoginMode = !isLoginMode;
   document.getElementById('authTitle').textContent = isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт';
@@ -233,7 +328,7 @@ async function handleAuth() {
       const data = await request('/login', { method: 'POST', body: JSON.stringify({ email, password }) });
       token = data.token; currentUser = data.user;
       localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(currentUser));
-      showApp();
+      initApp();
     } else {
       const name = document.getElementById('name').value.trim();
       const nickname = document.getElementById('nickname').value.trim();
@@ -246,46 +341,430 @@ async function handleAuth() {
 
 function logout() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
-  token = null; currentUser = null;
+  token = null; currentUser = null; if (eventSource) { eventSource.close(); eventSource = null; }
   document.getElementById('authContainer').style.display = 'block';
   document.getElementById('appContainer').style.display = 'none';
 }
 
-function showApp() {
+// ===== ИНИЦИАЛИЗАЦИЯ =====
+function initApp() {
   document.getElementById('authContainer').style.display = 'none';
   document.getElementById('appContainer').style.display = 'flex';
   document.getElementById('topName').textContent = currentUser.name;
   document.getElementById('topNickname').textContent = '@' + currentUser.nickname;
-  document.getElementById('welcomeMsg').textContent = 'Привет, ' + currentUser.name + '!';
+  if (currentUser.photo) { document.getElementById('topAvatar').innerHTML = '<img src="' + currentUser.photo + '" />'; } else { document.getElementById('topAvatar').textContent = currentUser.name.charAt(0).toUpperCase(); }
+  connectSSE();
+  switchTab('chats');
+  loadProfile();
 }
 
-// ===== НАВЕШИВАЕМ КНОПКИ (100% РАБОТАЕТ) =====
+function connectSSE() {
+  if (eventSource) { eventSource.close(); }
+  eventSource = new EventSource(API + '/events');
+  eventSource.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'new_message') {
+        if (selectedUser && data.from_user === selectedUser.id) loadMessages(selectedUser.id);
+        loadChats();
+      } else if (data.type === 'channel_message') {
+        if (selectedChannel && data.channel_id === selectedChannel.id) loadChannelMessages(selectedChannel.id);
+        loadChannels();
+      }
+    } catch(err) {}
+  };
+  eventSource.onerror = () => { eventSource.close(); setTimeout(connectSSE, 5000); };
+}
+
+// ===== ВКЛАДКИ =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.bottom-tabs button').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  const btnMap = { chats:'tabChatsBtn', contacts:'tabContactsBtn', channels:'tabChannelsBtn', profile:'tabProfileBtn' };
+  document.getElementById(btnMap[tab]).classList.add('active');
+  if (tab === 'chats') loadChats();
+  else if (tab === 'contacts') loadContacts();
+  else if (tab === 'channels') loadChannels();
+  else if (tab === 'profile') loadProfile();
+}
+
+// ===== ЧАТЫ =====
+async function loadChats() {
+  try { const data = await request('/chats/' + currentUser.id); contacts = data; renderContacts(); } catch(e) { showError(e.message); }
+}
+
+function renderContacts() {
+  const container = document.getElementById('contactsList');
+  if (!container) return;
+  if (contacts.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">💬</span>Нет чатов</div>'; return; }
+  container.innerHTML = contacts.map(c => {
+    const id = c.contact_id; const name = c.name || 'Без имени'; const nick = c.nickname || 'unknown'; const last = c.last_message || ''; const photo = c.photo || '';
+    return '<div class="contact" data-id="' + id + '" data-name="' + name + '" data-nick="' + nick + '" data-photo="' + photo + '">' +
+      '<div class="left"><div class="avatar">' + (photo ? '<img src="' + photo + '" />' : name.charAt(0).toUpperCase()) + '</div>' +
+      '<div class="info"><div class="name">' + name + '</div><div class="nickname">@' + nick + '</div>' +
+      (last ? '<div class="last-msg">' + last.slice(0,40) + (last.length>40?'...':'') + '</div>' : '') + '</div></div>' +
+      (last ? '<span class="status-icon">' + (c.last_message_read ? '✅' : '⏳') + '</span>' : '') +
+      '</div>';
+  }).join('');
+  document.querySelectorAll('.contact').forEach(el => {
+    el.addEventListener('click', function() {
+      selectUser({ id: parseInt(this.dataset.id), name: this.dataset.name, nickname: this.dataset.nick, photo: this.dataset.photo });
+    });
+  });
+}
+
+async function searchUsers() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) { contacts = []; renderContacts(); return; }
+  try { const data = await request('/search/' + encodeURIComponent(q) + '?exclude=' + currentUser.id); contacts = data; renderContacts(); } catch(e) { showError(e.message); }
+}
+
+function selectUser(user) {
+  if (!user || !user.id) return showError('Ошибка: нет ID');
+  selectedUser = user; selectedChannel = null;
+  document.getElementById('chatView').style.display = 'block';
+  document.getElementById('contactsView').style.display = 'none';
+  document.getElementById('selectedChatName').textContent = user.name;
+  document.getElementById('selectedChatSub').textContent = '@' + user.nickname;
+  loadMessages(user.id);
+}
+
+function goBackToChats() { selectedUser = null; document.getElementById('chatView').style.display = 'none'; document.getElementById('contactsView').style.display = 'block'; }
+
+async function loadMessages(userId) {
+  try {
+    const data = await request('/messages/' + currentUser.id + '/' + userId);
+    messages = data; renderMessages();
+    for (const m of messages.filter(m => m.to_user === currentUser.id && !m.read_at)) {
+      await request('/message/read', { method: 'POST', body: JSON.stringify({ message_id: m.id, user_id: currentUser.id }) });
+    }
+  } catch(e) { showError(e.message); }
+}
+
+function renderMessages() {
+  const container = document.getElementById('messagesList');
+  if (!container) return;
+  if (messages.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">💬</span>Начните переписку</div>'; return; }
+  container.innerHTML = messages.map(m => {
+    const isMy = m.from_user === currentUser.id;
+    let html = m.content || '';
+    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" style="max-width:150px;border-radius:8px;margin-top:4px;display:block;cursor:pointer;" />'; }
+    if (m.is_voice && m.file_url) { html += '<audio controls><source src="' + m.file_url + '" type="' + (m.file_type || 'audio/webm') + '" /></audio>'; }
+    return '<div class="message ' + (isMy ? 'my' : 'other') + '">' +
+      (!isMy ? '<div class="sender">' + (m.from_name || 'Собеседник') + '</div>' : '') +
+      html +
+      '<div class="time">' + formatTime(m.timestamp) + (isMy ? ' <span class="status-icon">' + (m.read_at ? '✅✅' : '✅') + '</span>' : '') + '</div></div>';
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+  document.querySelectorAll('.file-img').forEach(el => {
+    el.addEventListener('click', function() { openFullscreen(this.src); });
+  });
+}
+
+async function sendMessage() {
+  const content = document.getElementById('messageInput').value.trim();
+  if (!content || !selectedUser) return;
+  try { await request('/message', { method: 'POST', body: JSON.stringify({ from_user: currentUser.id, to_user: selectedUser.id, content }) }); document.getElementById('messageInput').value = ''; loadMessages(selectedUser.id); } catch(e) { showError(e.message); }
+}
+
+// ===== КОНТАКТЫ =====
+async function loadContacts() {
+  try { const data = await request('/search/?exclude=' + currentUser.id); allUsers = data; renderContactsTab(); } catch(e) { showError(e.message); }
+}
+
+function renderContactsTab() {
+  const container = document.getElementById('contactsListTab');
+  if (!container) return;
+  if (allUsers.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">👤</span>Нет контактов</div>'; return; }
+  container.innerHTML = allUsers.map(u => { const photo = u.photo || ''; return '<div class="contact-card" data-id="' + u.id + '">' +
+    '<div class="avatar-md">' + (photo ? '<img src="' + photo + '" />' : u.name.charAt(0).toUpperCase()) + '</div>' +
+    '<div class="info"><div class="name">' + u.name + '</div><div class="nickname">@' + u.nickname + '</div></div></div>'; }).join('');
+  document.querySelectorAll('.contact-card').forEach(el => {
+    el.addEventListener('click', function() {
+      const id = parseInt(this.dataset.id);
+      const user = allUsers.find(u => u.id === id);
+      if (user) { switchTab('chats'); selectUser(user); }
+    });
+  });
+}
+
+function filterContacts() {
+  const q = document.getElementById('contactsSearch').value.toLowerCase();
+  const container = document.getElementById('contactsListTab');
+  if (!container) return;
+  const filtered = allUsers.filter(u => u.name.toLowerCase().includes(q) || u.nickname.toLowerCase().includes(q));
+  if (filtered.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">🔍</span>Ничего не найдено</div>'; return; }
+  container.innerHTML = filtered.map(u => { const photo = u.photo || ''; return '<div class="contact-card" data-id="' + u.id + '">' +
+    '<div class="avatar-md">' + (photo ? '<img src="' + photo + '" />' : u.name.charAt(0).toUpperCase()) + '</div>' +
+    '<div class="info"><div class="name">' + u.name + '</div><div class="nickname">@' + u.nickname + '</div></div></div>'; }).join('');
+  document.querySelectorAll('.contact-card').forEach(el => {
+    el.addEventListener('click', function() {
+      const id = parseInt(this.dataset.id);
+      const user = allUsers.find(u => u.id === id);
+      if (user) { switchTab('chats'); selectUser(user); }
+    });
+  });
+}
+
+// ===== КАНАЛЫ =====
+async function loadChannels() {
+  try { const data = await request('/channels/' + currentUser.id); channels = data; renderChannels(); } catch(e) { showError(e.message); }
+}
+
+function renderChannels() {
+  const container = document.getElementById('channelsList');
+  if (!container) return;
+  if (channels.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>У вас нет каналов</div>'; return; }
+  container.innerHTML = channels.map(c => '<div class="contact" data-id="' + c.id + '" data-name="' + c.name + '" data-nick="' + (c.nickname||'') + '" data-private="' + c.is_private + '">' +
+    '<div class="left"><div class="info"><div class="name">' + c.name + '</div><div class="nickname">' + (c.nickname ? '@' + c.nickname : 'Приватный') + '</div></div></div>' +
+    '<span class="badge">' + (c.is_private ? '🔒' : '🌐') + '</span></div>').join('');
+  document.querySelectorAll('#channelsList .contact').forEach(el => {
+    el.addEventListener('click', function() {
+      selectChannel({ id: parseInt(this.dataset.id), name: this.dataset.name, nickname: this.dataset.nick, is_private: this.dataset.private === 'true' });
+    });
+  });
+}
+
+function selectChannel(channel) {
+  selectedChannel = channel; selectedUser = null;
+  document.getElementById('channelChatView').style.display = 'block';
+  document.getElementById('channelListView').style.display = 'none';
+  document.getElementById('selectedChannelName').textContent = channel.name;
+  document.getElementById('selectedChannelSub').textContent = channel.nickname ? '@' + channel.nickname : 'Приватный канал';
+  checkChannelAdmin(channel.id);
+  loadChannelMessages(channel.id);
+}
+
+function goBackToChannels() { selectedChannel = null; document.getElementById('channelChatView').style.display = 'none'; document.getElementById('channelListView').style.display = 'block'; loadChannels(); }
+
+async function checkChannelAdmin(channelId) {
+  try { const data = await request('/channel/check/' + channelId + '/' + currentUser.id); const isAdmin = data.isAdmin; document.getElementById('channelInputContainer').style.display = isAdmin ? 'flex' : 'none'; document.getElementById('channelEditBtn').style.display = isAdmin ? 'inline-block' : 'none'; } catch(e) {}
+}
+
+async function loadChannelMessages(channelId) {
+  try { const data = await request('/channel/messages/' + channelId); channelMessages = data; renderChannelMessages(); } catch(e) { showError(e.message); }
+}
+
+function renderChannelMessages() {
+  const container = document.getElementById('channelMessagesList');
+  if (!container) return;
+  if (channelMessages.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>Нет сообщений</div>'; return; }
+  container.innerHTML = channelMessages.map(m => {
+    const isMy = m.from_user === currentUser.id;
+    let html = m.content || '';
+    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" style="max-width:150px;border-radius:8px;margin-top:4px;display:block;cursor:pointer;" />'; }
+    if (m.is_voice && m.file_url) { html += '<audio controls><source src="' + m.file_url + '" type="' + (m.file_type || 'audio/webm') + '" /></audio>'; }
+    return '<div class="message ' + (isMy ? 'my' : 'other') + '">' +
+      (!isMy ? '<div class="sender">' + (m.from_name || 'Администратор') + '</div>' : '') +
+      html +
+      '<div class="time">' + formatTime(m.timestamp) + '</div></div>';
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+  document.querySelectorAll('#channelMessagesList .file-img').forEach(el => {
+    el.addEventListener('click', function() { openFullscreen(this.src); });
+  });
+}
+
+async function sendChannelMessage() {
+  const content = document.getElementById('channelMessageInput').value.trim();
+  if (!content || !selectedChannel) return;
+  try { await request('/channel/message', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, from_user: currentUser.id, content }) }); document.getElementById('channelMessageInput').value = ''; loadChannelMessages(selectedChannel.id); } catch(e) { showError(e.message); }
+}
+
+// ===== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА =====
+function showCreateChannelModal() { document.getElementById('createChannelModal').classList.add('active'); }
+function closeCreateChannelModal() { document.getElementById('createChannelModal').classList.remove('active'); }
+function showEditChannelModal() { if (!selectedChannel) return; document.getElementById('editChannelName').value = selectedChannel.name || ''; document.getElementById('editChannelNickname').value = selectedChannel.nickname || ''; document.getElementById('editChannelPrivate').checked = selectedChannel.is_private || false; document.getElementById('editChannelModal').classList.add('active'); }
+function closeEditChannelModal() { document.getElementById('editChannelModal').classList.remove('active'); }
+
+async function createChannel() {
+  const name = document.getElementById('channelName').value.trim();
+  const nickname = document.getElementById('channelNickname').value.trim();
+  const isPrivate = document.getElementById('channelPrivate').checked;
+  if (!name) return showError('Введите название');
+  try { const data = await request('/channel/create', { method: 'POST', body: JSON.stringify({ name, nickname: nickname || undefined, is_private: isPrivate, created_by: currentUser.id }) }); if (data.success) { showError('✅ Канал создан!', true); closeCreateChannelModal(); document.getElementById('channelName').value = ''; document.getElementById('channelNickname').value = ''; document.getElementById('channelPrivate').checked = false; switchTab('channels'); loadChannels(); } } catch(e) { showError(e.message); }
+}
+
+async function saveChannelChanges() {
+  const name = document.getElementById('editChannelName').value.trim();
+  const nickname = document.getElementById('editChannelNickname').value.trim();
+  const isPrivate = document.getElementById('editChannelPrivate').checked;
+  if (!name) return showError('Введите название');
+  try { const data = await request('/channel/update', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, user_id: currentUser.id, name, nickname: nickname || null, is_private: isPrivate }) }); if (data.success) { showError('✅ Канал обновлён!', true); closeEditChannelModal(); selectedChannel = data.channel; document.getElementById('selectedChannelName').textContent = selectedChannel.name; document.getElementById('selectedChannelSub').textContent = selectedChannel.nickname ? '@' + selectedChannel.nickname : 'Приватный канал'; loadChannels(); } } catch(e) { showError(e.message); }
+}
+
+// ===== ПРОФИЛЬ =====
+function loadProfile() {
+  document.getElementById('profileName').value = currentUser.name || '';
+  document.getElementById('profileNickname').value = currentUser.nickname || '';
+  document.getElementById('profileBirthDate').value = currentUser.birth_date || '';
+  const avatar = document.getElementById('profileAvatar');
+  if (currentUser.photo) { avatar.innerHTML = '<img src="' + currentUser.photo + '" />'; } else { avatar.textContent = currentUser.name.charAt(0).toUpperCase(); }
+}
+
+async function updateProfilePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 2*1024*1024) return showError('Файл > 2MB');
+  if (!file.type.startsWith('image/')) return showError('Только изображения');
+  try {
+    const reader = new FileReader();
+    reader.onloadend = async function() {
+      const data = await request('/profile/update', { method: 'POST', body: JSON.stringify({ user_id: currentUser.id, photo: reader.result }) });
+      if (data.success) { currentUser = data.user; localStorage.setItem('user', JSON.stringify(currentUser)); loadProfile(); document.getElementById('topAvatar').innerHTML = '<img src="' + currentUser.photo + '" />'; showError('✅ Фото обновлено!', true); }
+    };
+    reader.readAsDataURL(file);
+  } catch(e) { showError(e.message); }
+  event.target.value = '';
+}
+
+async function saveProfile() {
+  const name = document.getElementById('profileName').value.trim();
+  const nickname = document.getElementById('profileNickname').value.trim();
+  const birthDate = document.getElementById('profileBirthDate').value;
+  if (!name) return showError('Имя обязательно');
+  try { const data = await request('/profile/update', { method: 'POST', body: JSON.stringify({ user_id: currentUser.id, name, nickname, birth_date: birthDate || null }) }); if (data.success) { currentUser = data.user; localStorage.setItem('user', JSON.stringify(currentUser)); loadProfile(); document.getElementById('topName').textContent = currentUser.name; document.getElementById('topNickname').textContent = '@' + currentUser.nickname; showError('✅ Профиль обновлён!', true); } } catch(e) { showError(e.message); }
+}
+
+// ===== ФОТО =====
+function triggerFileUpload() { document.getElementById('fileInput').click(); document.getElementById('attachMenu').style.display = 'none'; }
+
+async function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file || !selectedUser) { event.target.value = ''; return; }
+  if (file.size > 5*1024*1024) return showError('Файл > 5MB');
+  if (!file.type.startsWith('image/')) return showError('Только изображения');
+  try {
+    const reader = new FileReader();
+    reader.onloadend = async function() {
+      await request('/upload', { method: 'POST', body: JSON.stringify({ from_user: currentUser.id, to_user: selectedUser.id, file_data: reader.result, file_name: file.name, file_type: file.type }) });
+      loadMessages(selectedUser.id);
+    };
+    reader.readAsDataURL(file);
+  } catch(e) { showError(e.message); }
+  event.target.value = '';
+}
+
+// ===== ГОЛОСОВЫЕ =====
+function toggleVoiceRecord() {
+  if (isRecording) { stopRecording(); } else { startRecording(); }
+}
+
+async function startRecording() {
+  if (isRecording) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.onloadend = async function() {
+        const base64 = reader.result;
+        if (selectedUser) {
+          await request('/message', { method: 'POST', body: JSON.stringify({ from_user: currentUser.id, to_user: selectedUser.id, content: '🎤 Голосовое', file_url: base64, file_type: 'audio/webm', is_voice: true }) });
+          loadMessages(selectedUser.id);
+        }
+      };
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach(t => t.stop());
+      document.getElementById('voiceBtn').classList.remove('recording');
+      isRecording = false;
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById('voiceBtn').classList.add('recording');
+  } catch(e) { showError('Нет доступа к микрофону'); }
+}
+
+function stopRecording() { if (mediaRecorder && isRecording) { mediaRecorder.stop(); } }
+
+function toggleAttachMenu() { const menu = document.getElementById('attachMenu'); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; }
+
+function openFullscreen(src) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;justify-content:center;align-items:center;cursor:pointer;';
+  overlay.innerHTML = '<img src="' + src + '" style="max-width:95%;max-height:95%;border-radius:12px;object-fit:contain;" />';
+  overlay.onclick = function() { this.remove(); };
+  document.body.appendChild(overlay);
+}
+
+// ============================================================
+// НАВЕШИВАНИЕ ВСЕХ КНОПОК (addEventListener)
+// ============================================================
 document.addEventListener('DOMContentLoaded', function() {
-  document.getElementById('authBtn').addEventListener('click', function(e) {
-    e.preventDefault();
-    handleAuth();
+
+  // АВТОРИЗАЦИЯ
+  document.getElementById('authBtn').addEventListener('click', function(e) { e.preventDefault(); handleAuth(); });
+  document.getElementById('toggleAuth').addEventListener('click', function(e) { e.preventDefault(); toggleMode(); });
+  document.getElementById('logoutBtn').addEventListener('click', function(e) { e.preventDefault(); logout(); });
+  document.getElementById('password').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); handleAuth(); } });
+
+  // ВКЛАДКИ
+  document.getElementById('tabChatsBtn').addEventListener('click', function() { switchTab('chats'); });
+  document.getElementById('tabContactsBtn').addEventListener('click', function() { switchTab('contacts'); });
+  document.getElementById('tabChannelsBtn').addEventListener('click', function() { switchTab('channels'); });
+  document.getElementById('tabProfileBtn').addEventListener('click', function() { switchTab('profile'); });
+  document.getElementById('profileTabBtn').addEventListener('click', function() { switchTab('profile'); });
+
+  // ЧАТЫ
+  document.getElementById('searchBtn').addEventListener('click', searchUsers);
+  document.getElementById('searchInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchUsers(); });
+  document.getElementById('backToChatsBtn').addEventListener('click', goBackToChats);
+  document.getElementById('sendMsgBtn').addEventListener('click', sendMessage);
+  document.getElementById('messageInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') sendMessage(); });
+
+  // ФОТО
+  document.getElementById('attachBtn').addEventListener('click', toggleAttachMenu);
+  document.getElementById('photoUploadBtn').addEventListener('click', triggerFileUpload);
+  document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+
+  // ГОЛОСОВЫЕ
+  document.getElementById('voiceBtn').addEventListener('click', toggleVoiceRecord);
+
+  // КОНТАКТЫ
+  document.getElementById('contactsSearch').addEventListener('input', filterContacts);
+
+  // КАНАЛЫ
+  document.getElementById('createChannelBtn').addEventListener('click', showCreateChannelModal);
+  document.getElementById('closeCreateChannelBtn').addEventListener('click', closeCreateChannelModal);
+  document.getElementById('createChannelSubmitBtn').addEventListener('click', createChannel);
+  document.getElementById('backToChannelsBtn').addEventListener('click', goBackToChannels);
+  document.getElementById('sendChannelMsgBtn').addEventListener('click', sendChannelMessage);
+  document.getElementById('channelMessageInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') sendChannelMessage(); });
+  document.getElementById('closeEditChannelBtn').addEventListener('click', closeEditChannelModal);
+  document.getElementById('saveChannelChangesBtn').addEventListener('click', saveChannelChanges);
+  document.getElementById('channelEditBtn').addEventListener('click', showEditChannelModal);
+
+  // ПРОФИЛЬ
+  document.getElementById('profileAvatar').addEventListener('click', function() { document.getElementById('profilePhotoInput').click(); });
+  document.getElementById('changePhotoHint').addEventListener('click', function() { document.getElementById('profilePhotoInput').click(); });
+  document.getElementById('profilePhotoInput').addEventListener('change', updateProfilePhoto);
+  document.getElementById('saveProfileBtn').addEventListener('click', saveProfile);
+
+  // МОДАЛКИ
+  document.getElementById('channelNickname').addEventListener('input', function() {
+    document.getElementById('channelPreview').textContent = this.value || 'никнейм';
   });
 
-  document.getElementById('toggleAuth').addEventListener('click', function(e) {
-    e.preventDefault();
-    toggleMode();
+  // КЛИК ВНЕ МОДАЛКИ ДЛЯ ЗАКРЫТИЯ
+  document.querySelectorAll('.modal-overlay').forEach(modal => {
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        this.classList.remove('active');
+      }
+    });
   });
 
-  document.getElementById('logoutBtn').addEventListener('click', function(e) {
-    e.preventDefault();
-    logout();
-  });
-
-  document.getElementById('password').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); handleAuth(); }
-  });
 });
 
 // ===== ПРОВЕРКА АВТОРИЗАЦИИ =====
 if (token && localStorage.getItem('user')) {
   try {
     currentUser = JSON.parse(localStorage.getItem('user'));
-    showApp();
+    initApp();
   } catch(e) {
     logout();
   }
@@ -298,7 +777,7 @@ if (token && localStorage.getItem('user')) {
 app.get('/', (req, res) => { res.send(HTML); });
 app.get('/api/health', (req, res) => { res.json({ status: 'ok', timestamp: new Date().toISOString(), postgres: !!pool }); });
 
-// ========== API МАРШРУТЫ (все функции) ==========
+// ========== ВСЕ API МАРШРУТЫ ==========
 app.post('/api/register', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { email, name, nickname, password } = req.body;
@@ -329,6 +808,184 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
     res.json({ success: true, token, user: { id: rows[0].id, email: rows[0].email, name: rows[0].name, nickname: rows[0].nickname, photo: rows[0].photo, birth_date: rows[0].birth_date } });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/me', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const { rows } = await pool.query('SELECT id, email, name, nickname, photo, birth_date FROM users WHERE id = $1', [decoded.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Пользователь не найден' });
+    res.json(rows[0]);
+  } catch(e) { res.status(401).json({ error: 'Неверный токен' }); }
+});
+
+app.post('/api/profile/update', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { user_id, name, nickname, photo, birth_date } = req.body;
+  if (!user_id) return res.status(400).json({ error: 'ID обязателен' });
+  try {
+    if (nickname) {
+      const dup = await pool.query('SELECT id FROM users WHERE nickname = $1 AND id != $2', [nickname, user_id]);
+      if (dup.rows.length > 0) return res.status(400).json({ error: 'Никнейм занят' });
+    }
+    await pool.query('UPDATE users SET name = COALESCE($1, name), nickname = COALESCE($2, nickname), photo = COALESCE($3, photo), birth_date = COALESCE($4, birth_date) WHERE id = $5', [name, nickname, photo, birth_date, user_id]);
+    const { rows } = await pool.query('SELECT id, email, name, nickname, photo, birth_date FROM users WHERE id = $1', [user_id]);
+    res.json({ success: true, user: rows[0] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/search/:nickname', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { nickname } = req.params;
+  const exclude = parseInt(req.query.exclude) || 0;
+  if (!nickname || nickname.trim() === '') return res.json([]);
+  try {
+    const { rows } = await pool.query('SELECT id, name, nickname, photo FROM users WHERE nickname ILIKE $1 AND id != $2 LIMIT 20', [nickname + '%', exclude]);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/channel/create', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { name, nickname, is_private, created_by } = req.body;
+  if (!name || !created_by) return res.status(400).json({ error: 'Название и создатель обязательны' });
+  try {
+    const inviteCode = is_private ? uuidv4().slice(0,8) : null;
+    const result = await pool.query('INSERT INTO channels (name, nickname, is_private, invite_code, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, nickname, is_private, invite_code', [name, nickname || null, is_private || false, inviteCode, created_by]);
+    await pool.query('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)', [result.rows[0].id, created_by]);
+    res.json({ success: true, channel: result.rows[0], link: is_private ? '/c/join/' + result.rows[0].invite_code : '/c/' + nickname });
+  } catch(e) {
+    if (e.message?.includes('duplicate')) return res.status(400).json({ error: 'Такой никнейм уже занят' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/channel/update', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { channel_id, user_id, name, nickname, is_private } = req.body;
+  if (!channel_id || !user_id) return res.status(400).json({ error: 'Канал и пользователь обязательны' });
+  try {
+    const check = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channel_id]);
+    if (!check.rows[0]) return res.status(404).json({ error: 'Канал не найден' });
+    if (check.rows[0].created_by !== user_id) return res.status(403).json({ error: 'Только создатель' });
+    if (nickname) {
+      const dup = await pool.query('SELECT id FROM channels WHERE nickname = $1 AND id != $2', [nickname, channel_id]);
+      if (dup.rows.length > 0) return res.status(400).json({ error: 'Никнейм занят' });
+    }
+    await pool.query('UPDATE channels SET name = COALESCE($1, name), nickname = COALESCE($2, nickname), is_private = COALESCE($3, is_private) WHERE id = $4', [name, nickname, is_private, channel_id]);
+    const { rows } = await pool.query('SELECT * FROM channels WHERE id = $1', [channel_id]);
+    res.json({ success: true, channel: rows[0] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/channels/:userId', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { userId } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT c.id, c.name, c.nickname, c.is_private, c.created_by, c.created_at, u.name as creator_name FROM channels c JOIN channel_members cm ON c.id = cm.channel_id JOIN users u ON c.created_by = u.id WHERE cm.user_id = $1 ORDER BY c.created_at DESC', [userId]);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/channel/check/:channelId/:userId', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { channelId, userId } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channelId]);
+    if (!rows[0]) return res.status(404).json({ error: 'Канал не найден' });
+    res.json({ isAdmin: rows[0].created_by === Number(userId) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/channel/message', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { channel_id, from_user, content, file_url, file_type, is_voice } = req.body;
+  if (!channel_id || !from_user) return res.status(400).json({ error: 'Канал и отправитель обязательны' });
+  try {
+    const check = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channel_id]);
+    if (!check.rows[0]) return res.status(404).json({ error: 'Канал не найден' });
+    if (check.rows[0].created_by !== from_user) return res.status(403).json({ error: 'Только создатель' });
+    await pool.query('INSERT INTO channel_messages (channel_id, from_user, content, file_url, file_type, is_voice) VALUES ($1, $2, $3, $4, $5, $6)', [channel_id, from_user, content || null, file_url || null, file_type || null, is_voice || false]);
+    clients.forEach(c => { try { c.res.write('data: ' + JSON.stringify({ type: 'channel_message', channel_id }) + '\\n\\n'); } catch(e) {} });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/channel/messages/:channelId', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { channelId } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT cm.*, u.name as from_name, u.nickname as from_nickname FROM channel_messages cm JOIN users u ON cm.from_user = u.id WHERE cm.channel_id = $1 ORDER BY cm.timestamp ASC', [channelId]);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/message', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { from_user, to_user, content, file_url, file_type, is_voice } = req.body;
+  if (!from_user || !to_user) return res.status(400).json({ error: 'Отправитель и получатель обязательны' });
+  try {
+    await pool.query('INSERT INTO messages (from_user, to_user, content, file_url, file_type, is_voice) VALUES ($1, $2, $3, $4, $5, $6)', [from_user, to_user, content || null, file_url || null, file_type || null, is_voice || false]);
+    clients.forEach(c => { try { c.res.write('data: ' + JSON.stringify({ type: 'new_message', to_user, from_user }) + '\\n\\n'); } catch(e) {} });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/message/read', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { message_id, user_id } = req.body;
+  if (!message_id || !user_id) return res.status(400).json({ error: 'ID обязательны' });
+  try {
+    await pool.query('UPDATE messages SET read_at = NOW() WHERE id = $1 AND to_user = $2', [message_id, user_id]);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/upload', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { from_user, to_user, file_data, file_name, file_type } = req.body;
+  if (!from_user || !to_user || !file_data) return res.status(400).json({ error: 'Все поля обязательны' });
+  try {
+    await pool.query('INSERT INTO messages (from_user, to_user, content, file_url, file_type) VALUES ($1, $2, $3, $4, $5)', [from_user, to_user, '📷 Фото', file_data, file_type || 'image/jpeg']);
+    clients.forEach(c => { try { c.res.write('data: ' + JSON.stringify({ type: 'new_message', to_user, from_user }) + '\\n\\n'); } catch(e) {} });
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/messages/:user1/:user2', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { user1, user2 } = req.params;
+  const id1 = Number(user1), id2 = Number(user2);
+  if (isNaN(id1) || isNaN(id2) || id1 <= 0 || id2 <= 0) return res.status(400).json({ error: 'Неверные ID' });
+  try {
+    const { rows } = await pool.query('SELECT m.*, u1.name as from_name, u2.name as to_name FROM messages m LEFT JOIN users u1 ON m.from_user = u1.id LEFT JOIN users u2 ON m.to_user = u2.id WHERE (m.from_user = $1 AND m.to_user = $2) OR (m.from_user = $2 AND m.to_user = $1) ORDER BY m.timestamp ASC', [id1, id2]);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/chats/:userId', async (req, res) => {
+  if (!pool) return res.status(500).json({ error: 'База не подключена' });
+  const { userId } = req.params;
+  const id = Number(userId);
+  if (isNaN(id) || id <= 0) return res.status(400).json({ error: 'Неверный ID' });
+  try {
+    const { rows } = await pool.query(`SELECT DISTINCT CASE WHEN m.from_user = $1 THEN m.to_user ELSE m.from_user END as contact_id, u.name, u.nickname, u.photo, (SELECT content FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message, (SELECT read_at FROM messages m2 WHERE (m2.from_user = $1 AND m2.to_user = u.id) OR (m2.from_user = u.id AND m2.to_user = $1) ORDER BY m2.timestamp DESC LIMIT 1) as last_message_read FROM messages m JOIN users u ON (u.id = m.from_user OR u.id = m.to_user) WHERE (m.from_user = $1 OR m.to_user = $1) AND u.id != $1 ORDER BY last_message_read DESC`, [id]);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const client = { id: Date.now(), res };
+  clients.push(client);
+  const ping = setInterval(() => { try { res.write(': ping\\n\\n'); } catch(e) { clearInterval(ping); } }, 30000);
+  req.on('close', () => { clearInterval(ping); clients = clients.filter(c => c.id !== client.id); });
 });
 
 const PORT = process.env.PORT || 3000;
