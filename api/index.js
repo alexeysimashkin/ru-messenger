@@ -46,8 +46,9 @@ async function initTables() {
 initTables();
 
 // ============================================================
-// HTML СТРАНИЦА (ПОЛНАЯ, С PWA)
+// HTML СТРАНИЦА (ИСПРАВЛЕННАЯ, С PWA)
 // ============================================================
+const DOMAIN = process.env.DOMAIN || 'ru-messenger.onrender.com';
 const HTML = `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -261,7 +262,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <input type="file" id="channelPhotoInput" class="hidden-file-input" accept="image/*" />
     </div>
     <div class="form-group"><label>Название *</label><input id="channelName" placeholder="Мой канал" /></div>
-    <div class="form-group"><label>Никнейм</label><input id="channelNickname" placeholder="my-channel" /><div class="hint">ru-mes.vercel.app/c/<span id="channelPreview">никнейм</span></div></div>
+    <div class="form-group"><label>Никнейм</label><input id="channelNickname" placeholder="my-channel" /><div class="hint">${DOMAIN}/c/<span id="channelPreview">никнейм</span></div></div>
     <div class="form-group checkbox"><input type="checkbox" id="channelPrivate" /><label>Приватный</label></div>
     <button class="btn-primary" id="createChannelSubmitBtn">Создать</button>
     <button class="btn-secondary" id="closeCreateChannelBtn">Отмена</button>
@@ -286,7 +287,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 
 <script>
 // ============================================================
-// ПОЛНАЯ ЛОГИКА
+// ПОЛНАЯ ЛОГИКА (ИСПРАВЛЕННАЯ)
 // ============================================================
 const API = '/api';
 let token = localStorage.getItem('token');
@@ -406,7 +407,7 @@ function switchTab(tab) {
   else if (tab === 'profile') loadProfile();
 }
 
-// ===== ЧАТЫ =====
+// ===== ЧАТЫ (ИСПРАВЛЕНА ЛОГИКА ОТКРЫТИЯ) =====
 async function loadChats() {
   try { const data = await request('/chats/' + currentUser.id); contacts = data; renderContacts(); } catch(e) { showError(e.message); }
 }
@@ -434,9 +435,19 @@ function renderContacts() {
 async function searchUsers() {
   const q = document.getElementById('searchInput').value.trim();
   if (!q) { contacts = []; renderContacts(); return; }
-  try { const data = await request('/search/' + encodeURIComponent(q) + '?exclude=' + currentUser.id); contacts = data; renderContacts(); } catch(e) { showError(e.message); }
+  try { 
+    const data = await request('/search/' + encodeURIComponent(q) + '?exclude=' + currentUser.id); 
+    // Рисуем найденных пользователей в списке контактов
+    contacts = data; 
+    renderContacts(); 
+    // Если нашли ровно одного пользователя — сразу открываем чат с ним
+    if (data.length === 1) {
+      selectUser(data[0]);
+    }
+  } catch(e) { showError(e.message); }
 }
 
+// Функция открытия чата (теперь вызывается и из поиска, и из списка)
 function selectUser(user) {
   if (!user || !user.id) return showError('Ошибка: нет ID');
   selectedUser = user; selectedChannel = null;
@@ -447,7 +458,11 @@ function selectUser(user) {
   loadMessages(user.id);
 }
 
-function goBackToChats() { selectedUser = null; document.getElementById('chatView').style.display = 'none'; document.getElementById('contactsView').style.display = 'block'; }
+function goBackToChats() { 
+  selectedUser = null; 
+  document.getElementById('chatView').style.display = 'none'; 
+  document.getElementById('contactsView').style.display = 'block'; 
+}
 
 async function loadMessages(userId) {
   try {
@@ -524,7 +539,7 @@ function filterContacts() {
   });
 }
 
-// ===== КАНАЛЫ =====
+// ===== КАНАЛЫ (ИСПРАВЛЕНЫ) =====
 async function loadChannels() {
   try { const data = await request('/channels/' + currentUser.id); channels = data; renderChannels(); } catch(e) { showError(e.message); }
 }
@@ -590,7 +605,7 @@ async function sendChannelMessage() {
   try { await request('/channel/message', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, from_user: currentUser.id, content }) }); document.getElementById('channelMessageInput').value = ''; loadChannelMessages(selectedChannel.id); } catch(e) { showError(e.message); }
 }
 
-// ===== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА С ФОТО =====
+// ===== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА С ФОТО (ИСПРАВЛЕНО) =====
 function showCreateChannelModal() { document.getElementById('createChannelModal').classList.add('active'); }
 function closeCreateChannelModal() { document.getElementById('createChannelModal').classList.remove('active'); }
 function showEditChannelModal() { if (!selectedChannel) return; document.getElementById('editChannelName').value = selectedChannel.name || ''; document.getElementById('editChannelNickname').value = selectedChannel.nickname || ''; document.getElementById('editChannelPrivate').checked = selectedChannel.is_private || false; if (selectedChannel.photo) { document.getElementById('editChannelAvatarPreview').innerHTML = '<img src="' + selectedChannel.photo + '" />'; } else { document.getElementById('editChannelAvatarPreview').innerHTML = '📢'; } document.getElementById('editChannelModal').classList.add('active'); }
@@ -830,11 +845,52 @@ app.get('/sw.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.send(`
     const CACHE_NAME = 'ru-messenger-v1';
-    const urlsToCache = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+    const urlsToCache = ['/', '/manifest.json'];
     self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache))); self.skipWaiting(); });
     self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => { if(k !== CACHE_NAME) return caches.delete(k); })))); self.clients.claim(); });
     self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
   `);
+});
+
+// ========== ИКОНКИ ДЛЯ PWA (ГЕНЕРИРУЕМ НА ЛЕТУ) ==========
+app.get('/icon-192.png', (req, res) => {
+  const { createCanvas } = await import('canvas');
+  const canvas = createCanvas(192, 192);
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,192,192);
+  grad.addColorStop(0, '#6c5ce7');
+  grad.addColorStop(1, '#a29bfe');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, 192, 192, 38);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 80px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('RU', 96, 100);
+  res.setHeader('Content-Type', 'image/png');
+  res.send(canvas.toBuffer());
+});
+
+app.get('/icon-512.png', (req, res) => {
+  const { createCanvas } = await import('canvas');
+  const canvas = createCanvas(512, 512);
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,512,512);
+  grad.addColorStop(0, '#6c5ce7');
+  grad.addColorStop(1, '#a29bfe');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, 512, 512, 102);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 200px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('RU', 256, 268);
+  res.setHeader('Content-Type', 'image/png');
+  res.send(canvas.toBuffer());
 });
 
 // ========== API ==========
