@@ -45,7 +45,9 @@ async function initTables() {
 }
 initTables();
 
-// ===== HTML (кнопки через onclick, ГАРАНТИРОВАННО РАБОТАЮТ) =====
+// ============================================================
+// HTML (ВСЁ ВНУТРИ, КНОПКИ НА onclick, ГАРАНТИРОВАННО РАБОТАЕТ)
+// ============================================================
 const HTML = `<!DOCTYPE html>
 <html>
 <head>
@@ -166,8 +168,8 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
   <div class="form-group"><label>Email</label><input id="email" type="email" placeholder="example@mail.ru" /></div>
   <div id="extraFields"></div>
   <div class="form-group"><label>Пароль</label><input id="password" type="password" placeholder="Введите пароль" /></div>
-  <button class="btn-primary" id="authBtn" onclick="handleAuth()">Войти</button>
-  <div class="auth-toggle"><span id="toggleAuth" onclick="toggleMode()">Зарегистрироваться</span></div>
+  <button class="btn-primary" onclick="window.handleAuth()">Войти</button>
+  <div class="auth-toggle"><span onclick="window.toggleMode()" style="cursor:pointer;">Зарегистрироваться</span></div>
 </div>
 
 <!-- ПРИЛОЖЕНИЕ -->
@@ -177,7 +179,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <div class="avatar" id="topAvatar">U</div>
       <div><div class="name" id="topName">User</div><div class="nickname" id="topNickname">@user</div></div>
     </div>
-    <button class="logout-btn" onclick="logout()">⏻</button>
+    <button class="logout-btn" onclick="window.logout()">⏻</button>
   </div>
 
   <div class="bottom-tabs">
@@ -190,7 +192,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
   <!-- ЧАТЫ -->
   <div id="tab-chats" class="tab-content active">
     <div id="contactsView">
-      <div class="search-row"><input id="searchInput" placeholder="🔍 Поиск по никнейму..." /><button onclick="searchUsers()">Найти</button></div>
+      <div class="search-row"><input id="searchInput" placeholder="🔍 Поиск по никнейму..." /><button onclick="window.searchUsers()">Найти</button></div>
       <div id="contactsList"></div>
     </div>
     <div id="chatView" style="display:none;">
@@ -198,32 +200,32 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <div class="messages-container" id="messagesList"></div>
       <div class="input-container">
         <input id="messageInput" placeholder="Сообщение..." />
-        <button onclick="sendMessage()">Отправить</button>
-        <button class="icon-btn" id="voiceBtn" onclick="toggleVoiceRecord()">🎤</button>
-        <button class="icon-btn" id="attachBtn" onclick="toggleAttachMenu()">📎</button>
-        <div id="attachMenu"><div class="menu-item" onclick="triggerFileUpload()">🖼️ Фото</div></div>
+        <button onclick="window.sendMessage()">Отправить</button>
+        <button class="icon-btn" onclick="window.toggleVoiceRecord()">🎤</button>
+        <button class="icon-btn" onclick="window.toggleAttachMenu()">📎</button>
+        <div id="attachMenu"><div class="menu-item" onclick="window.triggerFileUpload()">🖼️ Фото</div></div>
       </div>
-      <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="handleFileSelect(event)" />
+      <input type="file" id="fileInput" class="hidden-file-input" accept="image/*" onchange="window.handleFileSelect(event)" />
     </div>
   </div>
 
   <!-- КОНТАКТЫ -->
   <div id="tab-contacts" class="tab-content">
-    <div class="search-row"><input id="contactsSearch" placeholder="🔍 Поиск контактов..." oninput="filterContacts(this.value)" /></div>
+    <div class="search-row"><input id="contactsSearch" placeholder="🔍 Поиск контактов..." oninput="window.filterContacts(this.value)" /></div>
     <div id="contactsListTab"></div>
   </div>
 
   <!-- КАНАЛЫ -->
   <div id="tab-channels" class="tab-content">
     <div id="channelListView">
-      <button class="create-channel-btn" onclick="showCreateChannelModal()">➕ Создать канал</button>
+      <button class="create-channel-btn" onclick="window.showCreateChannelModal()">➕ Создать канал</button>
       <div id="channelsList"></div>
     </div>
     <div id="channelChatView" style="display:none;">
-      <div class="chat-header"><button class="back" onclick="goBackToChannels()">←</button><div><div class="name" id="selectedChannelName"></div><div class="sub" id="selectedChannelSub"></div></div><button class="edit-btn" id="channelEditBtn" onclick="showEditChannelModal()" style="display:none;">✏️</button></div>
+      <div class="chat-header"><button class="back" onclick="goBackToChannels()">←</button><div><div class="name" id="selectedChannelName"></div><div class="sub" id="selectedChannelSub"></div></div><button class="edit-btn" id="channelEditBtn" onclick="window.showEditChannelModal()" style="display:none;">✏️</button></div>
       <div class="messages-container" id="channelMessagesList"></div>
       <div class="input-container" id="channelInputContainer" style="display:none;">
-        <input id="channelMessageInput" placeholder="Сообщение в канал..." /><button onclick="sendChannelMessage()">Отправить</button>
+        <input id="channelMessageInput" placeholder="Сообщение в канал..." /><button onclick="window.sendChannelMessage()">Отправить</button>
       </div>
     </div>
   </div>
@@ -233,11 +235,11 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
     <div style="text-align:center;padding:10px 0;">
       <div class="profile-avatar" id="profileAvatar" onclick="document.getElementById('profilePhotoInput').click()">U</div>
       <div class="avatar-hint" onclick="document.getElementById('profilePhotoInput').click()" style="font-size:12px;color:#666;cursor:pointer;text-align:center;">Нажмите, чтобы изменить фото</div>
-      <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" onchange="updateProfilePhoto(event)" />
+      <input type="file" id="profilePhotoInput" class="hidden-file-input" accept="image/*" onchange="window.updateProfilePhoto(event)" />
       <div class="form-group" style="margin-top:16px;"><label>Имя</label><input id="profileName" placeholder="Ваше имя" /></div>
       <div class="form-group"><label>Никнейм</label><input id="profileNickname" placeholder="Ваш никнейм" /></div>
       <div class="form-group"><label>Дата рождения</label><input id="profileBirthDate" type="date" /></div>
-      <button class="btn-primary" onclick="saveProfile()">💾 Сохранить</button>
+      <button class="btn-primary" onclick="window.saveProfile()">💾 Сохранить</button>
     </div>
   </div>
 </div>
@@ -249,8 +251,8 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
     <div class="form-group"><label>Название *</label><input id="channelName" placeholder="Мой канал" /></div>
     <div class="form-group"><label>Никнейм</label><input id="channelNickname" placeholder="my-channel" /><div class="hint">ru-mes.vercel.app/c/<span id="channelPreview">никнейм</span></div></div>
     <div class="form-group checkbox"><input type="checkbox" id="channelPrivate" /><label>Приватный</label></div>
-    <button class="btn-primary" onclick="createChannel()">Создать</button>
-    <button class="btn-secondary" onclick="closeCreateChannelModal()">Отмена</button>
+    <button class="btn-primary" onclick="window.createChannel()">Создать</button>
+    <button class="btn-secondary" onclick="window.closeCreateChannelModal()">Отмена</button>
   </div>
 </div>
 
@@ -260,28 +262,30 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
     <div class="form-group"><label>Название</label><input id="editChannelName" placeholder="Название" /></div>
     <div class="form-group"><label>Никнейм</label><input id="editChannelNickname" placeholder="my-channel" /></div>
     <div class="form-group checkbox"><input type="checkbox" id="editChannelPrivate" /><label>Приватный</label></div>
-    <button class="btn-primary" onclick="saveChannelChanges()">💾 Сохранить</button>
-    <button class="btn-secondary" onclick="closeEditChannelModal()">Отмена</button>
+    <button class="btn-primary" onclick="window.saveChannelChanges()">💾 Сохранить</button>
+    <button class="btn-secondary" onclick="window.closeEditChannelModal()">Отмена</button>
   </div>
 </div>
 
 <script>
-// ===== ВСЕ ФУНКЦИИ ГЛОБАЛЬНЫЕ (для onclick) =====
-const API = '/api';
-let token = localStorage.getItem('token');
-let currentUser = null;
-let selectedUser = null;
-let selectedChannel = null;
-let contacts = [];
-let channels = [];
-let messages = [];
-let channelMessages = [];
-let allUsers = [];
-let isLoginMode = true;
-let isRecording = false;
-let mediaRecorder = null;
-let audioChunks = [];
-let eventSource = null;
+// ============================================================
+// ВСЕ ГЛОБАЛЬНЫЕ ФУНКЦИИ (для onclick)
+// ============================================================
+window.API = '/api';
+window.token = localStorage.getItem('token');
+window.currentUser = null;
+window.selectedUser = null;
+window.selectedChannel = null;
+window.contacts = [];
+window.channels = [];
+window.messages = [];
+window.channelMessages = [];
+window.allUsers = [];
+window.isLoginMode = true;
+window.isRecording = false;
+window.mediaRecorder = null;
+window.audioChunks = [];
+window.eventSource = null;
 
 function showError(msg, success = false) {
   const el = document.getElementById('errorMessage');
@@ -296,8 +300,8 @@ function formatTime(d) { return new Date(d).toLocaleTimeString('ru-RU', { hour:'
 
 async function request(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(API + path, { ...opts, headers: { ...headers, ...opts.headers } });
+  if (window.token) headers['Authorization'] = 'Bearer ' + window.token;
+  const res = await fetch(window.API + path, { ...opts, headers: { ...headers, ...opts.headers } });
   const text = await res.text();
   if (!text) throw new Error('Пустой ответ');
   const data = JSON.parse(text);
@@ -306,38 +310,39 @@ async function request(path, opts = {}) {
 }
 
 // ===== АВТОРИЗАЦИЯ =====
-function toggleMode() {
-  isLoginMode = !isLoginMode;
-  document.getElementById('authTitle').textContent = isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт';
-  document.getElementById('authBtn').textContent = isLoginMode ? 'Войти' : 'Создать аккаунт';
-  document.getElementById('toggleAuth').textContent = isLoginMode ? 'Зарегистрироваться' : 'Войти';
-  document.getElementById('extraFields').innerHTML = isLoginMode ? '' : 
+window.toggleMode = function() {
+  window.isLoginMode = !window.isLoginMode;
+  document.getElementById('authTitle').textContent = window.isLoginMode ? 'Войдите в свой аккаунт' : 'Создайте новый аккаунт';
+  document.getElementById('authBtn').textContent = window.isLoginMode ? 'Войти' : 'Создать аккаунт';
+  const toggleEl = document.querySelector('.auth-toggle span');
+  if (toggleEl) toggleEl.textContent = window.isLoginMode ? 'Зарегистрироваться' : 'Войти';
+  document.getElementById('extraFields').innerHTML = window.isLoginMode ? '' : 
     '<div class="form-group"><label>Имя</label><input id="name" placeholder="Ваше имя" /></div><div class="form-group"><label>Никнейм</label><input id="nickname" placeholder="Ваш никнейм" /></div>';
 }
 
-async function handleAuth() {
+window.handleAuth = async function() {
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   if (!email || !password) { showError('Заполните все поля'); return; }
   try {
-    if (isLoginMode) {
+    if (window.isLoginMode) {
       const data = await request('/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-      token = data.token; currentUser = data.user;
-      localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(currentUser));
+      window.token = data.token; window.currentUser = data.user;
+      localStorage.setItem('token', window.token); localStorage.setItem('user', JSON.stringify(window.currentUser));
       initApp();
     } else {
       const name = document.getElementById('name').value.trim();
       const nickname = document.getElementById('nickname').value.trim();
       if (!name || !nickname) { showError('Заполните все поля'); return; }
       const data = await request('/register', { method: 'POST', body: JSON.stringify({ email, name, nickname, password }) });
-      if (data.success) { showError('✅ Регистрация успешна! Теперь войдите.', true); isLoginMode = true; toggleMode(); document.getElementById('email').value = email; document.getElementById('password').value = ''; }
+      if (data.success) { showError('✅ Регистрация успешна! Теперь войдите.', true); window.isLoginMode = true; window.toggleMode(); document.getElementById('email').value = email; document.getElementById('password').value = ''; }
     }
   } catch (err) { showError(err.message); }
 }
 
-function logout() {
+window.logout = function() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
-  token = null; currentUser = null; if (eventSource) { eventSource.close(); eventSource = null; }
+  window.token = null; window.currentUser = null; if (window.eventSource) { window.eventSource.close(); window.eventSource = null; }
   document.getElementById('authContainer').style.display = 'block';
   document.getElementById('appContainer').style.display = 'none';
 }
@@ -346,30 +351,30 @@ function logout() {
 function initApp() {
   document.getElementById('authContainer').style.display = 'none';
   document.getElementById('appContainer').style.display = 'flex';
-  document.getElementById('topName').textContent = currentUser.name;
-  document.getElementById('topNickname').textContent = '@' + currentUser.nickname;
-  if (currentUser.photo) { document.getElementById('topAvatar').innerHTML = '<img src="' + currentUser.photo + '" />'; } else { document.getElementById('topAvatar').textContent = currentUser.name.charAt(0).toUpperCase(); }
+  document.getElementById('topName').textContent = window.currentUser.name;
+  document.getElementById('topNickname').textContent = '@' + window.currentUser.nickname;
+  if (window.currentUser.photo) { document.getElementById('topAvatar').innerHTML = '<img src="' + window.currentUser.photo + '" />'; } else { document.getElementById('topAvatar').textContent = window.currentUser.name.charAt(0).toUpperCase(); }
   connectSSE();
   switchTab('chats');
   loadProfile();
 }
 
 function connectSSE() {
-  if (eventSource) { eventSource.close(); }
-  eventSource = new EventSource(API + '/events');
-  eventSource.onmessage = (e) => {
+  if (window.eventSource) { window.eventSource.close(); }
+  window.eventSource = new EventSource(window.API + '/events');
+  window.eventSource.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
       if (data.type === 'new_message') {
-        if (selectedUser && data.from_user === selectedUser.id) loadMessages(selectedUser.id);
+        if (window.selectedUser && data.from_user === window.selectedUser.id) loadMessages(window.selectedUser.id);
         loadChats();
       } else if (data.type === 'channel_message') {
-        if (selectedChannel && data.channel_id === selectedChannel.id) loadChannelMessages(selectedChannel.id);
+        if (window.selectedChannel && data.channel_id === window.selectedChannel.id) loadChannelMessages(window.selectedChannel.id);
         loadChannels();
       }
     } catch(err) {}
   };
-  eventSource.onerror = () => { eventSource.close(); setTimeout(connectSSE, 5000); };
+  window.eventSource.onerror = () => { window.eventSource.close(); setTimeout(connectSSE, 5000); };
 }
 
 // ===== ВКЛАДКИ =====
@@ -383,19 +388,20 @@ function switchTab(tab) {
   else if (tab === 'channels') loadChannels();
   else if (tab === 'profile') loadProfile();
 }
+window.switchTab = switchTab;
 
 // ===== ЧАТЫ =====
 async function loadChats() {
-  try { const data = await request('/chats/' + currentUser.id); contacts = data; renderContacts(); } catch(e) { showError(e.message); }
+  try { const data = await request('/chats/' + window.currentUser.id); window.contacts = data; renderContacts(); } catch(e) { showError(e.message); }
 }
 
 function renderContacts() {
   const container = document.getElementById('contactsList');
   if (!container) return;
-  if (contacts.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">💬</span>Нет чатов</div>'; return; }
-  container.innerHTML = contacts.map(c => {
+  if (window.contacts.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">💬</span>Нет чатов</div>'; return; }
+  container.innerHTML = window.contacts.map(c => {
     const id = c.contact_id; const name = c.name || 'Без имени'; const nick = c.nickname || 'unknown'; const last = c.last_message || ''; const photo = c.photo || '';
-    return '<div class="contact" onclick="selectUser({id:' + id + ',name:\'' + name + '\',nickname:\'' + nick + '\',photo:\'' + photo + '\'})">' +
+    return '<div class="contact" onclick="window.selectUser({id:' + id + ',name:\'' + name + '\',nickname:\'' + nick + '\',photo:\'' + photo + '\'})">' +
       '<div class="left"><div class="avatar">' + (photo ? '<img src="' + photo + '" />' : name.charAt(0).toUpperCase()) + '</div>' +
       '<div class="info"><div class="name">' + name + '</div><div class="nickname">@' + nick + '</div>' +
       (last ? '<div class="last-msg">' + last.slice(0,40) + (last.length>40?'...':'') + '</div>' : '') + '</div></div>' +
@@ -404,15 +410,15 @@ function renderContacts() {
   }).join('');
 }
 
-async function searchUsers() {
+window.searchUsers = async function() {
   const q = document.getElementById('searchInput').value.trim();
-  if (!q) { contacts = []; renderContacts(); return; }
-  try { const data = await request('/search/' + encodeURIComponent(q) + '?exclude=' + currentUser.id); contacts = data; renderContacts(); } catch(e) { showError(e.message); }
+  if (!q) { window.contacts = []; renderContacts(); return; }
+  try { const data = await request('/search/' + encodeURIComponent(q) + '?exclude=' + window.currentUser.id); window.contacts = data; renderContacts(); } catch(e) { showError(e.message); }
 }
 
-function selectUser(user) {
+window.selectUser = function(user) {
   if (!user || !user.id) return showError('Ошибка: нет ID');
-  selectedUser = user; selectedChannel = null;
+  window.selectedUser = user; window.selectedChannel = null;
   document.getElementById('chatView').style.display = 'block';
   document.getElementById('contactsView').style.display = 'none';
   document.getElementById('selectedChatName').textContent = user.name;
@@ -420,14 +426,15 @@ function selectUser(user) {
   loadMessages(user.id);
 }
 
-function goBackToChats() { selectedUser = null; document.getElementById('chatView').style.display = 'none'; document.getElementById('contactsView').style.display = 'block'; }
+function goBackToChats() { window.selectedUser = null; document.getElementById('chatView').style.display = 'none'; document.getElementById('contactsView').style.display = 'block'; }
+window.goBackToChats = goBackToChats;
 
 async function loadMessages(userId) {
   try {
-    const data = await request('/messages/' + currentUser.id + '/' + userId);
-    messages = data; renderMessages();
-    for (const m of messages.filter(m => m.to_user === currentUser.id && !m.read_at)) {
-      await request('/message/read', { method: 'POST', body: JSON.stringify({ message_id: m.id, user_id: currentUser.id }) });
+    const data = await request('/messages/' + window.currentUser.id + '/' + userId);
+    window.messages = data; renderMessages();
+    for (const m of window.messages.filter(m => m.to_user === window.currentUser.id && !m.read_at)) {
+      await request('/message/read', { method: 'POST', body: JSON.stringify({ message_id: m.id, user_id: window.currentUser.id }) });
     }
   } catch(e) { showError(e.message); }
 }
@@ -435,11 +442,11 @@ async function loadMessages(userId) {
 function renderMessages() {
   const container = document.getElementById('messagesList');
   if (!container) return;
-  if (messages.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">💬</span>Начните переписку</div>'; return; }
-  container.innerHTML = messages.map(m => {
-    const isMy = m.from_user === currentUser.id;
+  if (window.messages.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">💬</span>Начните переписку</div>'; return; }
+  container.innerHTML = window.messages.map(m => {
+    const isMy = m.from_user === window.currentUser.id;
     let html = m.content || '';
-    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" onclick="openFullscreen(\'' + m.file_url + '\')" />'; }
+    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" onclick="window.openFullscreen(\'' + m.file_url + '\')" />'; }
     if (m.is_voice && m.file_url) { html += '<audio controls><source src="' + m.file_url + '" type="' + (m.file_type || 'audio/webm') + '" /></audio>'; }
     return '<div class="message ' + (isMy ? 'my' : 'other') + '">' +
       (!isMy ? '<div class="sender">' + (m.from_name || 'Собеседник') + '</div>' : '') +
@@ -449,54 +456,54 @@ function renderMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendMessage() {
+window.sendMessage = async function() {
   const content = document.getElementById('messageInput').value.trim();
-  if (!content || !selectedUser) return;
-  try { await request('/message', { method: 'POST', body: JSON.stringify({ from_user: currentUser.id, to_user: selectedUser.id, content }) }); document.getElementById('messageInput').value = ''; loadMessages(selectedUser.id); } catch(e) { showError(e.message); }
+  if (!content || !window.selectedUser) return;
+  try { await request('/message', { method: 'POST', body: JSON.stringify({ from_user: window.currentUser.id, to_user: window.selectedUser.id, content }) }); document.getElementById('messageInput').value = ''; loadMessages(window.selectedUser.id); } catch(e) { showError(e.message); }
 }
 
 // ===== КОНТАКТЫ =====
 async function loadContacts() {
-  try { const data = await request('/search/?exclude=' + currentUser.id); allUsers = data; renderContactsTab(); } catch(e) { showError(e.message); }
+  try { const data = await request('/search/?exclude=' + window.currentUser.id); window.allUsers = data; renderContactsTab(); } catch(e) { showError(e.message); }
 }
 
 function renderContactsTab() {
   const container = document.getElementById('contactsListTab');
   if (!container) return;
-  if (allUsers.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">👤</span>Нет контактов</div>'; return; }
-  container.innerHTML = allUsers.map(u => { const photo = u.photo || ''; return '<div class="contact-card" onclick="openChatFromContact(' + u.id + ')">' +
+  if (window.allUsers.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">👤</span>Нет контактов</div>'; return; }
+  container.innerHTML = window.allUsers.map(u => { const photo = u.photo || ''; return '<div class="contact-card" onclick="window.openChatFromContact(' + u.id + ')">' +
     '<div class="avatar-md">' + (photo ? '<img src="' + photo + '" />' : u.name.charAt(0).toUpperCase()) + '</div>' +
     '<div class="info"><div class="name">' + u.name + '</div><div class="nickname">@' + u.nickname + '</div></div></div>'; }).join('');
 }
 
-function filterContacts(q) {
+window.filterContacts = function(q) {
   const container = document.getElementById('contactsListTab');
   if (!container) return;
-  const filtered = allUsers.filter(u => u.name.toLowerCase().includes(q.toLowerCase()) || u.nickname.toLowerCase().includes(q.toLowerCase()));
+  const filtered = window.allUsers.filter(u => u.name.toLowerCase().includes(q.toLowerCase()) || u.nickname.toLowerCase().includes(q.toLowerCase()));
   if (filtered.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">🔍</span>Ничего не найдено</div>'; return; }
-  container.innerHTML = filtered.map(u => { const photo = u.photo || ''; return '<div class="contact-card" onclick="openChatFromContact(' + u.id + ')">' +
+  container.innerHTML = filtered.map(u => { const photo = u.photo || ''; return '<div class="contact-card" onclick="window.openChatFromContact(' + u.id + ')">' +
     '<div class="avatar-md">' + (photo ? '<img src="' + photo + '" />' : u.name.charAt(0).toUpperCase()) + '</div>' +
     '<div class="info"><div class="name">' + u.name + '</div><div class="nickname">@' + u.nickname + '</div></div></div>'; }).join('');
 }
 
-function openChatFromContact(id) { const user = allUsers.find(u => u.id === id); if (user) { switchTab('chats'); selectUser(user); } }
+window.openChatFromContact = function(id) { const user = window.allUsers.find(u => u.id === id); if (user) { switchTab('chats'); window.selectUser(user); } }
 
 // ===== КАНАЛЫ =====
 async function loadChannels() {
-  try { const data = await request('/channels/' + currentUser.id); channels = data; renderChannels(); } catch(e) { showError(e.message); }
+  try { const data = await request('/channels/' + window.currentUser.id); window.channels = data; renderChannels(); } catch(e) { showError(e.message); }
 }
 
 function renderChannels() {
   const container = document.getElementById('channelsList');
   if (!container) return;
-  if (channels.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>У вас нет каналов</div>'; return; }
-  container.innerHTML = channels.map(c => '<div class="contact" onclick="selectChannel({id:' + c.id + ',name:\'' + c.name + '\',nickname:\'' + (c.nickname||'') + '\',is_private:' + c.is_private + '})">' +
+  if (window.channels.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>У вас нет каналов</div>'; return; }
+  container.innerHTML = window.channels.map(c => '<div class="contact" onclick="window.selectChannel({id:' + c.id + ',name:\'' + c.name + '\',nickname:\'' + (c.nickname||'') + '\',is_private:' + c.is_private + '})">' +
     '<div class="left"><div class="info"><div class="name">' + c.name + '</div><div class="nickname">' + (c.nickname ? '@' + c.nickname : 'Приватный') + '</div></div></div>' +
     '<span class="badge">' + (c.is_private ? '🔒' : '🌐') + '</span></div>').join('');
 }
 
-function selectChannel(channel) {
-  selectedChannel = channel; selectedUser = null;
+window.selectChannel = function(channel) {
+  window.selectedChannel = channel; window.selectedUser = null;
   document.getElementById('channelChatView').style.display = 'block';
   document.getElementById('channelListView').style.display = 'none';
   document.getElementById('selectedChannelName').textContent = channel.name;
@@ -505,24 +512,25 @@ function selectChannel(channel) {
   loadChannelMessages(channel.id);
 }
 
-function goBackToChannels() { selectedChannel = null; document.getElementById('channelChatView').style.display = 'none'; document.getElementById('channelListView').style.display = 'block'; loadChannels(); }
+function goBackToChannels() { window.selectedChannel = null; document.getElementById('channelChatView').style.display = 'none'; document.getElementById('channelListView').style.display = 'block'; loadChannels(); }
+window.goBackToChannels = goBackToChannels;
 
 async function checkChannelAdmin(channelId) {
-  try { const data = await request('/channel/check/' + channelId + '/' + currentUser.id); const isAdmin = data.isAdmin; document.getElementById('channelInputContainer').style.display = isAdmin ? 'flex' : 'none'; document.getElementById('channelEditBtn').style.display = isAdmin ? 'inline-block' : 'none'; } catch(e) {}
+  try { const data = await request('/channel/check/' + channelId + '/' + window.currentUser.id); const isAdmin = data.isAdmin; document.getElementById('channelInputContainer').style.display = isAdmin ? 'flex' : 'none'; document.getElementById('channelEditBtn').style.display = isAdmin ? 'inline-block' : 'none'; } catch(e) {}
 }
 
 async function loadChannelMessages(channelId) {
-  try { const data = await request('/channel/messages/' + channelId); channelMessages = data; renderChannelMessages(); } catch(e) { showError(e.message); }
+  try { const data = await request('/channel/messages/' + channelId); window.channelMessages = data; renderChannelMessages(); } catch(e) { showError(e.message); }
 }
 
 function renderChannelMessages() {
   const container = document.getElementById('channelMessagesList');
   if (!container) return;
-  if (channelMessages.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>Нет сообщений</div>'; return; }
-  container.innerHTML = channelMessages.map(m => {
-    const isMy = m.from_user === currentUser.id;
+  if (window.channelMessages.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>Нет сообщений</div>'; return; }
+  container.innerHTML = window.channelMessages.map(m => {
+    const isMy = m.from_user === window.currentUser.id;
     let html = m.content || '';
-    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" onclick="openFullscreen(\'' + m.file_url + '\')" />'; }
+    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" onclick="window.openFullscreen(\'' + m.file_url + '\')" />'; }
     if (m.is_voice && m.file_url) { html += '<audio controls><source src="' + m.file_url + '" type="' + (m.file_type || 'audio/webm') + '" /></audio>'; }
     return '<div class="message ' + (isMy ? 'my' : 'other') + '">' +
       (!isMy ? '<div class="sender">' + (m.from_name || 'Администратор') + '</div>' : '') +
@@ -532,44 +540,44 @@ function renderChannelMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
-async function sendChannelMessage() {
+window.sendChannelMessage = async function() {
   const content = document.getElementById('channelMessageInput').value.trim();
-  if (!content || !selectedChannel) return;
-  try { await request('/channel/message', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, from_user: currentUser.id, content }) }); document.getElementById('channelMessageInput').value = ''; loadChannelMessages(selectedChannel.id); } catch(e) { showError(e.message); }
+  if (!content || !window.selectedChannel) return;
+  try { await request('/channel/message', { method: 'POST', body: JSON.stringify({ channel_id: window.selectedChannel.id, from_user: window.currentUser.id, content }) }); document.getElementById('channelMessageInput').value = ''; loadChannelMessages(window.selectedChannel.id); } catch(e) { showError(e.message); }
 }
 
 // ===== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА =====
-function showCreateChannelModal() { document.getElementById('createChannelModal').classList.add('active'); }
-function closeCreateChannelModal() { document.getElementById('createChannelModal').classList.remove('active'); }
-function showEditChannelModal() { if (!selectedChannel) return; document.getElementById('editChannelName').value = selectedChannel.name || ''; document.getElementById('editChannelNickname').value = selectedChannel.nickname || ''; document.getElementById('editChannelPrivate').checked = selectedChannel.is_private || false; document.getElementById('editChannelModal').classList.add('active'); }
-function closeEditChannelModal() { document.getElementById('editChannelModal').classList.remove('active'); }
+window.showCreateChannelModal = function() { document.getElementById('createChannelModal').classList.add('active'); }
+window.closeCreateChannelModal = function() { document.getElementById('createChannelModal').classList.remove('active'); }
+window.showEditChannelModal = function() { if (!window.selectedChannel) return; document.getElementById('editChannelName').value = window.selectedChannel.name || ''; document.getElementById('editChannelNickname').value = window.selectedChannel.nickname || ''; document.getElementById('editChannelPrivate').checked = window.selectedChannel.is_private || false; document.getElementById('editChannelModal').classList.add('active'); }
+window.closeEditChannelModal = function() { document.getElementById('editChannelModal').classList.remove('active'); }
 
-async function createChannel() {
+window.createChannel = async function() {
   const name = document.getElementById('channelName').value.trim();
   const nickname = document.getElementById('channelNickname').value.trim();
   const isPrivate = document.getElementById('channelPrivate').checked;
   if (!name) return showError('Введите название');
-  try { const data = await request('/channel/create', { method: 'POST', body: JSON.stringify({ name, nickname: nickname || undefined, is_private: isPrivate, created_by: currentUser.id }) }); if (data.success) { showError('✅ Канал создан!', true); closeCreateChannelModal(); document.getElementById('channelName').value = ''; document.getElementById('channelNickname').value = ''; document.getElementById('channelPrivate').checked = false; switchTab('channels'); loadChannels(); } } catch(e) { showError(e.message); }
+  try { const data = await request('/channel/create', { method: 'POST', body: JSON.stringify({ name, nickname: nickname || undefined, is_private: isPrivate, created_by: window.currentUser.id }) }); if (data.success) { showError('✅ Канал создан!', true); window.closeCreateChannelModal(); document.getElementById('channelName').value = ''; document.getElementById('channelNickname').value = ''; document.getElementById('channelPrivate').checked = false; switchTab('channels'); loadChannels(); } } catch(e) { showError(e.message); }
 }
 
-async function saveChannelChanges() {
+window.saveChannelChanges = async function() {
   const name = document.getElementById('editChannelName').value.trim();
   const nickname = document.getElementById('editChannelNickname').value.trim();
   const isPrivate = document.getElementById('editChannelPrivate').checked;
   if (!name) return showError('Введите название');
-  try { const data = await request('/channel/update', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, user_id: currentUser.id, name, nickname: nickname || null, is_private: isPrivate }) }); if (data.success) { showError('✅ Канал обновлён!', true); closeEditChannelModal(); selectedChannel = data.channel; document.getElementById('selectedChannelName').textContent = selectedChannel.name; document.getElementById('selectedChannelSub').textContent = selectedChannel.nickname ? '@' + selectedChannel.nickname : 'Приватный канал'; loadChannels(); } } catch(e) { showError(e.message); }
+  try { const data = await request('/channel/update', { method: 'POST', body: JSON.stringify({ channel_id: window.selectedChannel.id, user_id: window.currentUser.id, name, nickname: nickname || null, is_private: isPrivate }) }); if (data.success) { showError('✅ Канал обновлён!', true); window.closeEditChannelModal(); window.selectedChannel = data.channel; document.getElementById('selectedChannelName').textContent = window.selectedChannel.name; document.getElementById('selectedChannelSub').textContent = window.selectedChannel.nickname ? '@' + window.selectedChannel.nickname : 'Приватный канал'; loadChannels(); } } catch(e) { showError(e.message); }
 }
 
 // ===== ПРОФИЛЬ =====
 function loadProfile() {
-  document.getElementById('profileName').value = currentUser.name || '';
-  document.getElementById('profileNickname').value = currentUser.nickname || '';
-  document.getElementById('profileBirthDate').value = currentUser.birth_date || '';
+  document.getElementById('profileName').value = window.currentUser.name || '';
+  document.getElementById('profileNickname').value = window.currentUser.nickname || '';
+  document.getElementById('profileBirthDate').value = window.currentUser.birth_date || '';
   const avatar = document.getElementById('profileAvatar');
-  if (currentUser.photo) { avatar.innerHTML = '<img src="' + currentUser.photo + '" />'; } else { avatar.textContent = currentUser.name.charAt(0).toUpperCase(); }
+  if (window.currentUser.photo) { avatar.innerHTML = '<img src="' + window.currentUser.photo + '" />'; } else { avatar.textContent = window.currentUser.name.charAt(0).toUpperCase(); }
 }
 
-async function updateProfilePhoto(event) {
+window.updateProfilePhoto = async function(event) {
   const file = event.target.files[0];
   if (!file) return;
   if (file.size > 2*1024*1024) return showError('Файл > 2MB');
@@ -577,35 +585,35 @@ async function updateProfilePhoto(event) {
   try {
     const reader = new FileReader();
     reader.onloadend = async function() {
-      const data = await request('/profile/update', { method: 'POST', body: JSON.stringify({ user_id: currentUser.id, photo: reader.result }) });
-      if (data.success) { currentUser = data.user; localStorage.setItem('user', JSON.stringify(currentUser)); loadProfile(); document.getElementById('topAvatar').innerHTML = '<img src="' + currentUser.photo + '" />'; showError('✅ Фото обновлено!', true); }
+      const data = await request('/profile/update', { method: 'POST', body: JSON.stringify({ user_id: window.currentUser.id, photo: reader.result }) });
+      if (data.success) { window.currentUser = data.user; localStorage.setItem('user', JSON.stringify(window.currentUser)); loadProfile(); document.getElementById('topAvatar').innerHTML = '<img src="' + window.currentUser.photo + '" />'; showError('✅ Фото обновлено!', true); }
     };
     reader.readAsDataURL(file);
   } catch(e) { showError(e.message); }
   event.target.value = '';
 }
 
-async function saveProfile() {
+window.saveProfile = async function() {
   const name = document.getElementById('profileName').value.trim();
   const nickname = document.getElementById('profileNickname').value.trim();
   const birthDate = document.getElementById('profileBirthDate').value;
   if (!name) return showError('Имя обязательно');
-  try { const data = await request('/profile/update', { method: 'POST', body: JSON.stringify({ user_id: currentUser.id, name, nickname, birth_date: birthDate || null }) }); if (data.success) { currentUser = data.user; localStorage.setItem('user', JSON.stringify(currentUser)); loadProfile(); document.getElementById('topName').textContent = currentUser.name; document.getElementById('topNickname').textContent = '@' + currentUser.nickname; showError('✅ Профиль обновлён!', true); } } catch(e) { showError(e.message); }
+  try { const data = await request('/profile/update', { method: 'POST', body: JSON.stringify({ user_id: window.currentUser.id, name, nickname, birth_date: birthDate || null }) }); if (data.success) { window.currentUser = data.user; localStorage.setItem('user', JSON.stringify(window.currentUser)); loadProfile(); document.getElementById('topName').textContent = window.currentUser.name; document.getElementById('topNickname').textContent = '@' + window.currentUser.nickname; showError('✅ Профиль обновлён!', true); } } catch(e) { showError(e.message); }
 }
 
 // ===== ФОТО =====
-function triggerFileUpload() { document.getElementById('fileInput').click(); document.getElementById('attachMenu').style.display = 'none'; }
+window.triggerFileUpload = function() { document.getElementById('fileInput').click(); document.getElementById('attachMenu').style.display = 'none'; }
 
-async function handleFileSelect(event) {
+window.handleFileSelect = async function(event) {
   const file = event.target.files[0];
-  if (!file || !selectedUser) { event.target.value = ''; return; }
+  if (!file || !window.selectedUser) { event.target.value = ''; return; }
   if (file.size > 5*1024*1024) return showError('Файл > 5MB');
   if (!file.type.startsWith('image/')) return showError('Только изображения');
   try {
     const reader = new FileReader();
     reader.onloadend = async function() {
-      await request('/upload', { method: 'POST', body: JSON.stringify({ from_user: currentUser.id, to_user: selectedUser.id, file_data: reader.result, file_name: file.name, file_type: file.type }) });
-      loadMessages(selectedUser.id);
+      await request('/upload', { method: 'POST', body: JSON.stringify({ from_user: window.currentUser.id, to_user: window.selectedUser.id, file_data: reader.result, file_name: file.name, file_type: file.type }) });
+      loadMessages(window.selectedUser.id);
     };
     reader.readAsDataURL(file);
   } catch(e) { showError(e.message); }
@@ -613,43 +621,43 @@ async function handleFileSelect(event) {
 }
 
 // ===== ГОЛОСОВЫЕ =====
-function toggleVoiceRecord() {
-  if (isRecording) { stopRecording(); } else { startRecording(); }
+window.toggleVoiceRecord = function() {
+  if (window.isRecording) { stopRecording(); } else { startRecording(); }
 }
 
 async function startRecording() {
-  if (isRecording) return;
+  if (window.isRecording) return;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    audioChunks = [];
-    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-    mediaRecorder.onstop = async () => {
-      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    window.mediaRecorder = new MediaRecorder(stream);
+    window.audioChunks = [];
+    window.mediaRecorder.ondataavailable = e => window.audioChunks.push(e.data);
+    window.mediaRecorder.onstop = async () => {
+      const blob = new Blob(window.audioChunks, { type: 'audio/webm' });
       const reader = new FileReader();
       reader.onloadend = async function() {
         const base64 = reader.result;
-        if (selectedUser) {
-          await request('/message', { method: 'POST', body: JSON.stringify({ from_user: currentUser.id, to_user: selectedUser.id, content: '🎤 Голосовое', file_url: base64, file_type: 'audio/webm', is_voice: true }) });
-          loadMessages(selectedUser.id);
+        if (window.selectedUser) {
+          await request('/message', { method: 'POST', body: JSON.stringify({ from_user: window.currentUser.id, to_user: window.selectedUser.id, content: '🎤 Голосовое', file_url: base64, file_type: 'audio/webm', is_voice: true }) });
+          loadMessages(window.selectedUser.id);
         }
       };
       reader.readAsDataURL(blob);
       stream.getTracks().forEach(t => t.stop());
       document.getElementById('voiceBtn').classList.remove('recording');
-      isRecording = false;
+      window.isRecording = false;
     };
-    mediaRecorder.start();
-    isRecording = true;
+    window.mediaRecorder.start();
+    window.isRecording = true;
     document.getElementById('voiceBtn').classList.add('recording');
   } catch(e) { showError('Нет доступа к микрофону'); }
 }
 
-function stopRecording() { if (mediaRecorder && isRecording) { mediaRecorder.stop(); } }
+function stopRecording() { if (window.mediaRecorder && window.isRecording) { window.mediaRecorder.stop(); } }
 
-function toggleAttachMenu() { const menu = document.getElementById('attachMenu'); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; }
+window.toggleAttachMenu = function() { const menu = document.getElementById('attachMenu'); menu.style.display = menu.style.display === 'block' ? 'none' : 'block'; }
 
-function openFullscreen(src) {
+window.openFullscreen = function(src) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;justify-content:center;align-items:center;cursor:pointer;';
   overlay.innerHTML = '<img src="' + src + '" style="max-width:95%;max-height:95%;border-radius:12px;object-fit:contain;" />';
@@ -657,19 +665,19 @@ function openFullscreen(src) {
   document.body.appendChild(overlay);
 }
 
-// Enter
-document.getElementById('messageInput')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendMessage(); });
-document.getElementById('channelMessageInput')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendChannelMessage(); });
-document.getElementById('password')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') handleAuth(); });
+// ===== ENTER =====
+document.getElementById('messageInput')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.sendMessage(); });
+document.getElementById('channelMessageInput')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.sendChannelMessage(); });
+document.getElementById('password')?.addEventListener('keydown', function(e) { if (e.key === 'Enter') window.handleAuth(); });
 document.getElementById('channelNickname')?.addEventListener('input', function() { document.getElementById('channelPreview').textContent = this.value || 'никнейм'; });
 
 // ===== ПРОВЕРКА АВТОРИЗАЦИИ =====
-if (token && localStorage.getItem('user')) {
+if (window.token && localStorage.getItem('user')) {
   try {
-    currentUser = JSON.parse(localStorage.getItem('user'));
+    window.currentUser = JSON.parse(localStorage.getItem('user'));
     initApp();
   } catch(e) {
-    logout();
+    window.logout();
   }
 }
 </script>
@@ -680,7 +688,7 @@ if (token && localStorage.getItem('user')) {
 app.get('/', (req, res) => { res.send(HTML); });
 app.get('/api/health', (req, res) => { res.json({ status: 'ok', timestamp: new Date().toISOString(), postgres: !!pool }); });
 
-// ========== РЕГИСТРАЦИЯ ==========
+// ========== API МАРШРУТЫ ==========
 app.post('/api/register', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { email, name, nickname, password } = req.body;
@@ -699,7 +707,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// ========== ВХОД ==========
 app.post('/api/login', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { email, password } = req.body;
@@ -714,7 +721,6 @@ app.post('/api/login', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ========== ВСЕ ОСТАЛЬНЫЕ API ==========
 app.get('/api/me', async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Нет токена' });
