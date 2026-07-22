@@ -6,8 +6,8 @@ import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 let pool = null;
 let clients = [];
@@ -31,7 +31,7 @@ async function initTables() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, nickname TEXT UNIQUE NOT NULL, password TEXT NOT NULL, photo TEXT, birth_date TEXT, created_at TIMESTAMP DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, from_user INTEGER REFERENCES users(id) ON DELETE CASCADE, to_user INTEGER REFERENCES users(id) ON DELETE CASCADE, content TEXT, file_url TEXT, file_type TEXT, is_voice BOOLEAN DEFAULT FALSE, read_at TIMESTAMP, timestamp TIMESTAMP DEFAULT NOW())`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, name TEXT NOT NULL, nickname TEXT UNIQUE, is_private BOOLEAN DEFAULT FALSE, invite_code TEXT UNIQUE, created_by INTEGER REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMP DEFAULT NOW())`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, name TEXT NOT NULL, nickname TEXT UNIQUE, photo TEXT, is_private BOOLEAN DEFAULT FALSE, invite_code TEXT UNIQUE, created_by INTEGER REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMP DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS channel_members (id SERIAL PRIMARY KEY, channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, joined_at TIMESTAMP DEFAULT NOW(), UNIQUE(channel_id, user_id))`);
     await pool.query(`CREATE TABLE IF NOT EXISTS channel_messages (id SERIAL PRIMARY KEY, channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE, from_user INTEGER REFERENCES users(id) ON DELETE CASCADE, content TEXT, file_url TEXT, file_type TEXT, is_voice BOOLEAN DEFAULT FALSE, timestamp TIMESTAMP DEFAULT NOW())`);
     const ch = await pool.query('SELECT id FROM channels WHERE nickname = $1', ['ru_news']);
@@ -46,18 +46,21 @@ async function initTables() {
 initTables();
 
 // ============================================================
-// HTML (ПОЛНАЯ ВЕРСИЯ СО ВСЕМИ ФУНКЦИЯМИ)
+// HTML СТРАНИЦА (ПОЛНАЯ, С PWA)
 // ============================================================
 const HTML = `<!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>RU Мессенджер</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#6c5ce7">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
-#app{width:100%;max-width:480px;background:#0f0f0f;border-radius:32px;padding:40px 32px;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:0}
+#app{width:100%;max-width:480px;height:100vh;max-height:900px;background:#0f0f0f;display:flex;flex-direction:column;overflow:hidden;position:relative}
+@media(min-width:481px){#app{border-radius:24px;height:90vh;box-shadow:0 20px 80px rgba(0,0,0,0.8)}}
 .logo{text-align:center;margin-bottom:36px}
 .logo-icon{width:72px;height:72px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);border-radius:24px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;color:#fff;font-weight:700}
 .logo h1{font-size:28px;font-weight:700;color:#fff}
@@ -74,27 +77,42 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 .error-message{background:#2a0a0a;color:#ff6b6b;padding:12px 16px;border-radius:12px;font-size:13px;margin-bottom:16px;display:none;border-left:4px solid #ff6b6b}
 .error-message.show{display:block}
 .error-message.success{background:#0a2a0a;color:#51cf66;border-left-color:#51cf66}
-.loading{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.app-container{display:none;flex-direction:column;gap:16px}
-.user-info{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #1a1a1a}
-.user-info .name{color:#fff;font-weight:600;font-size:16px}
-.user-info .nickname{color:#666;font-size:13px}
-.logout-btn{background:none;border:none;color:#666;font-size:20px;cursor:pointer}
-.contact{padding:12px 14px;background:#1a1a1a;border-radius:12px;margin-bottom:6px;cursor:pointer;transition:all .3s;display:flex;justify-content:space-between;align-items:center}
-.contact:hover{background:#222}
-.contact .name{color:#fff;font-weight:600;font-size:14px}
-.contact .nickname{color:#666;font-size:12px}
-.contact .badge{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;padding:2px 10px;border-radius:20px;font-size:10px}
+.app-container{display:none;flex-direction:column;height:100%;background:#0f0f0f}
+.top-bar{padding:12px 16px;background:#0f0f0f;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.top-bar .user-info{display:flex;align-items:center;gap:10px;cursor:pointer}
+.top-bar .avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;overflow:hidden;flex-shrink:0}
+.top-bar .avatar img{width:100%;height:100%;object-fit:cover}
+.top-bar .name{color:#fff;font-weight:600;font-size:15px}
+.top-bar .nickname{color:#666;font-size:12px}
+.top-bar .logout-btn{background:none;border:none;color:#666;font-size:20px;cursor:pointer}
+.tab-content{display:none;flex:1;overflow-y:auto;padding:12px 16px;background:#0f0f0f}
+.tab-content.active{display:block}
+.tab-content::-webkit-scrollbar{width:4px}
+.tab-content::-webkit-scrollbar-thumb{background:#333;border-radius:10px}
+.bottom-tabs{display:flex;background:#1a1a1a;border-top:1px solid #222;flex-shrink:0}
+.bottom-tabs button{flex:1;padding:8px 0 6px;border:none;background:transparent;font-size:10px;font-weight:500;cursor:pointer;color:#666;display:flex;flex-direction:column;align-items:center;gap:2px}
+.bottom-tabs button .tab-icon{font-size:20px}
+.bottom-tabs button.active{color:#6c5ce7}
 .search-row{display:flex;gap:8px;margin-bottom:16px}
 .search-row input{flex:1;padding:10px 14px;border:2px solid #2a2a2a;border-radius:12px;font-size:14px;background:#1a1a1a;color:#fff}
 .search-row input:focus{outline:none;border-color:#6c5ce7}
 .search-row button{padding:10px 16px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer}
-.chat-header{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1a1a1a}
+.contact{padding:12px 14px;background:#1a1a1a;border-radius:12px;margin-bottom:6px;cursor:pointer;transition:all .3s;display:flex;justify-content:space-between;align-items:center}
+.contact:hover{background:#222}
+.contact .left{display:flex;align-items:center;gap:10px;flex:1;overflow:hidden}
+.contact .avatar-sm{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;overflow:hidden;flex-shrink:0}
+.contact .avatar-sm img{width:100%;height:100%;object-fit:cover}
+.contact .info{flex:1;min-width:0}
+.contact .name{color:#fff;font-weight:600;font-size:14px}
+.contact .nickname{color:#666;font-size:12px}
+.contact .last-msg{font-size:12px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.contact .status-icon{font-size:14px}
+.contact .badge{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;padding:2px 10px;border-radius:20px;font-size:10px}
+.chat-header{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1a1a1a;margin-bottom:10px}
 .chat-header .back{background:none;border:none;font-size:22px;cursor:pointer;color:#6c5ce7}
 .chat-header .name{color:#fff;font-weight:600;font-size:15px}
 .chat-header .sub{color:#666;font-size:12px}
-.messages-container{max-height:300px;overflow-y:auto;padding:8px 0}
+.messages-container{max-height:300px;overflow-y:auto;padding:8px 0;flex:1}
 .message{padding:8px 12px;margin:3px 0;border-radius:12px;max-width:80%;word-wrap:break-word}
 .message.my{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;margin-left:auto;border-bottom-right-radius:3px}
 .message.other{background:#1a1a1a;color:#ddd;border-bottom-left-radius:3px}
@@ -102,7 +120,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 .message .sender{font-size:10px;opacity:0.7;margin-bottom:2px;color:#888}
 .message .status-icon{font-size:12px}
 .message .file-img{max-width:150px;border-radius:8px;margin-top:4px;display:block;cursor:pointer}
-.input-container{display:flex;gap:6px;padding:6px 0;flex-wrap:wrap}
+.input-container{display:flex;gap:6px;padding:6px 0;flex-wrap:wrap;position:relative}
 .input-container input{flex:1;padding:10px 14px;border:2px solid #2a2a2a;border-radius:12px;font-size:14px;background:#1a1a1a;color:#fff;min-width:50px}
 .input-container input:focus{outline:none;border-color:#6c5ce7}
 .input-container button{padding:10px 14px;background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;border:none;border-radius:12px;font-weight:600;cursor:pointer}
@@ -115,32 +133,25 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 .hidden-file-input{display:none}
 .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center;padding:20px}
 .modal-overlay.active{display:flex}
-.modal-content{background:#1a1a1a;border-radius:20px;padding:28px;max-width:400px;width:100%;border:1px solid #2a2a2a}
+.modal-content{background:#1a1a1a;border-radius:20px;padding:28px;max-width:400px;width:100%;border:1px solid #2a2a2a;max-height:90vh;overflow-y:auto}
 .modal-content h3{color:#fff;margin-bottom:16px;font-size:18px}
 .modal-content .form-group{margin-bottom:14px}
-.modal-content .form-group label{font-size:12px;color:#888}
+.modal-content .form-group label{font-size:12px;color:#888;display:block;margin-bottom:4px}
 .modal-content .form-group input{width:100%;padding:12px 14px;border:2px solid #2a2a2a;border-radius:12px;font-size:14px;background:#0f0f0f;color:#fff}
 .modal-content .form-group input:focus{outline:none;border-color:#6c5ce7}
 .modal-content .form-group .hint{font-size:11px;color:#555;margin-top:4px}
 .modal-content .form-group.checkbox{display:flex;align-items:center;gap:10px}
 .modal-content .form-group.checkbox input{width:16px;height:16px;accent-color:#6c5ce7}
-.modal-content .form-group.checkbox label{font-size:13px;color:#ccc}
+.modal-content .form-group.checkbox label{font-size:13px;color:#ccc;margin:0}
 .modal-content .btn-secondary{width:100%;padding:12px;background:#2a2a2a;color:#888;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px}
 .modal-content .btn-secondary:hover{background:#333;color:#fff}
-.bottom-tabs{display:flex;background:#1a1a1a;border-top:1px solid #222;margin-top:12px}
-.bottom-tabs button{flex:1;padding:8px 0 6px;border:none;background:transparent;font-size:10px;font-weight:500;cursor:pointer;color:#666;display:flex;flex-direction:column;align-items:center;gap:2px}
-.bottom-tabs button .tab-icon{font-size:20px}
-.bottom-tabs button.active{color:#6c5ce7}
-.tab-content{display:none}
-.tab-content.active{display:block}
+.modal-content .avatar-upload{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:16px}
+.modal-content .avatar-upload .avatar-preview{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;font-weight:700;overflow:hidden;cursor:pointer;border:3px solid #2a2a2a}
+.modal-content .avatar-upload .avatar-preview img{width:100%;height:100%;object-fit:cover}
+.modal-content .avatar-upload .avatar-hint{font-size:12px;color:#666;cursor:pointer}
+.modal-content .avatar-upload .avatar-hint:hover{color:#6c5ce7}
 .empty{text-align:center;color:#444;padding:40px 0;font-size:14px}
 .empty .icon{font-size:48px;display:block;margin-bottom:12px}
-.avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden}
-.avatar img{width:100%;height:100%;object-fit:cover}
-.contact .left{display:flex;align-items:center;gap:10px;flex:1;overflow:hidden}
-.contact .info{flex:1;min-width:0}
-.contact .last-msg{font-size:12px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.contact .status-icon{font-size:14px}
 .create-channel-btn{width:100%;padding:12px;background:#1a1a1a;border:2px dashed #6c5ce7;border-radius:12px;font-size:14px;font-weight:600;color:#6c5ce7;cursor:pointer;margin-bottom:10px}
 .create-channel-btn:hover{background:#6c5ce7;color:#fff}
 .edit-btn{background:none;border:none;color:#666;font-size:16px;cursor:pointer;padding:4px 8px}
@@ -148,7 +159,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 .profile-avatar{width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;font-weight:700;margin:0 auto 16px;overflow:hidden;cursor:pointer;border:3px solid #2a2a2a}
 .profile-avatar img{width:100%;height:100%;object-fit:cover}
 .contact-card{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#1a1a1a;border-radius:12px;margin-bottom:6px;cursor:pointer}
-.contact-card .avatar-md{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden}
+.contact-card .avatar-md{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6c5ce7,#a29bfe);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;overflow:hidden;flex-shrink:0}
 .contact-card .avatar-md img{width:100%;height:100%;object-fit:cover}
 .contact-card .info .name{color:#fff;font-weight:600;font-size:14px}
 .contact-card .info .nickname{color:#666;font-size:12px}
@@ -158,7 +169,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 <div id="app">
 
 <!-- АВТОРИЗАЦИЯ -->
-<div id="authContainer">
+<div id="authContainer" style="padding:40px 32px;flex:1;display:flex;flex-direction:column;justify-content:center;background:#0f0f0f">
   <div class="logo">
     <div class="logo-icon">RU</div>
     <h1>Мессенджер <span>RU</span></h1>
@@ -173,29 +184,21 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 </div>
 
 <!-- ПРИЛОЖЕНИЕ -->
-<div id="appContainer" style="display:none;flex-direction:column;gap:16px;">
-  <div class="user-info">
-    <div style="display:flex;align-items:center;gap:10px;cursor:pointer" id="profileTabBtn">
+<div id="appContainer" class="app-container">
+  <div class="top-bar">
+    <div class="user-info" id="profileTabBtn">
       <div class="avatar" id="topAvatar">U</div>
       <div><div class="name" id="topName">User</div><div class="nickname" id="topNickname">@user</div></div>
     </div>
     <button class="logout-btn" id="logoutBtn">⏻</button>
   </div>
 
-  <div class="bottom-tabs">
-    <button data-tab="chats" class="active" id="tabChatsBtn">💬 Чаты</button>
-    <button data-tab="contacts" id="tabContactsBtn">👤 Контакты</button>
-    <button data-tab="channels" id="tabChannelsBtn">📢 Каналы</button>
-    <button data-tab="profile" id="tabProfileBtn">👤 Профиль</button>
-  </div>
-
-  <!-- ЧАТЫ -->
   <div id="tab-chats" class="tab-content active">
-    <div id="contactsView">
+    <div id="contactsView" style="display:block">
       <div class="search-row"><input id="searchInput" placeholder="🔍 Поиск по никнейму..." /><button id="searchBtn">Найти</button></div>
       <div id="contactsList"></div>
     </div>
-    <div id="chatView" style="display:none;">
+    <div id="chatView" style="display:none;flex-direction:column;height:100%">
       <div class="chat-header"><button class="back" id="backToChatsBtn">←</button><div><div class="name" id="selectedChatName"></div><div class="sub" id="selectedChatSub"></div></div></div>
       <div class="messages-container" id="messagesList"></div>
       <div class="input-container">
@@ -209,19 +212,17 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
     </div>
   </div>
 
-  <!-- КОНТАКТЫ -->
   <div id="tab-contacts" class="tab-content">
     <div class="search-row"><input id="contactsSearch" placeholder="🔍 Поиск контактов..." /></div>
     <div id="contactsListTab"></div>
   </div>
 
-  <!-- КАНАЛЫ -->
   <div id="tab-channels" class="tab-content">
     <div id="channelListView">
       <button class="create-channel-btn" id="createChannelBtn">➕ Создать канал</button>
       <div id="channelsList"></div>
     </div>
-    <div id="channelChatView" style="display:none;">
+    <div id="channelChatView" style="display:none;flex-direction:column;height:100%">
       <div class="chat-header"><button class="back" id="backToChannelsBtn">←</button><div><div class="name" id="selectedChannelName"></div><div class="sub" id="selectedChannelSub"></div></div><button class="edit-btn" id="channelEditBtn" style="display:none;">✏️</button></div>
       <div class="messages-container" id="channelMessagesList"></div>
       <div class="input-container" id="channelInputContainer" style="display:none;">
@@ -230,7 +231,6 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
     </div>
   </div>
 
-  <!-- ПРОФИЛЬ -->
   <div id="tab-profile" class="tab-content">
     <div style="text-align:center;padding:10px 0;">
       <div class="profile-avatar" id="profileAvatar">U</div>
@@ -242,12 +242,24 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
       <button class="btn-primary" id="saveProfileBtn">💾 Сохранить</button>
     </div>
   </div>
+
+  <div class="bottom-tabs">
+    <button data-tab="chats" class="active" id="tabChatsBtn"><span class="tab-icon">💬</span>Чаты</button>
+    <button data-tab="contacts" id="tabContactsBtn"><span class="tab-icon">👤</span>Контакты</button>
+    <button data-tab="channels" id="tabChannelsBtn"><span class="tab-icon">📢</span>Каналы</button>
+    <button data-tab="profile" id="tabProfileBtn"><span class="tab-icon">👤</span>Профиль</button>
+  </div>
 </div>
 
 <!-- МОДАЛКИ -->
 <div class="modal-overlay" id="createChannelModal">
   <div class="modal-content">
     <h3>📢 Создать канал</h3>
+    <div class="avatar-upload">
+      <div class="avatar-preview" id="channelAvatarPreview" onclick="document.getElementById('channelPhotoInput').click()" style="font-size:32px;">📢</div>
+      <div class="avatar-hint" onclick="document.getElementById('channelPhotoInput').click()">Нажмите, чтобы добавить фото</div>
+      <input type="file" id="channelPhotoInput" class="hidden-file-input" accept="image/*" />
+    </div>
     <div class="form-group"><label>Название *</label><input id="channelName" placeholder="Мой канал" /></div>
     <div class="form-group"><label>Никнейм</label><input id="channelNickname" placeholder="my-channel" /><div class="hint">ru-mes.vercel.app/c/<span id="channelPreview">никнейм</span></div></div>
     <div class="form-group checkbox"><input type="checkbox" id="channelPrivate" /><label>Приватный</label></div>
@@ -259,6 +271,11 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 <div class="modal-overlay" id="editChannelModal">
   <div class="modal-content">
     <h3>✏️ Редактировать канал</h3>
+    <div class="avatar-upload">
+      <div class="avatar-preview" id="editChannelAvatarPreview" onclick="document.getElementById('editChannelPhotoInput').click()">📢</div>
+      <div class="avatar-hint" onclick="document.getElementById('editChannelPhotoInput').click()">Нажмите, чтобы изменить фото</div>
+      <input type="file" id="editChannelPhotoInput" class="hidden-file-input" accept="image/*" />
+    </div>
     <div class="form-group"><label>Название</label><input id="editChannelName" placeholder="Название" /></div>
     <div class="form-group"><label>Никнейм</label><input id="editChannelNickname" placeholder="my-channel" /></div>
     <div class="form-group checkbox"><input type="checkbox" id="editChannelPrivate" /><label>Приватный</label></div>
@@ -269,7 +286,7 @@ body{font-family:-apple-system,sans-serif;background:#0a0a0a;min-height:100vh;di
 
 <script>
 // ============================================================
-// ПОЛНАЯ ЛОГИКА (ВСЁ ЧЕРЕЗ addEventListener)
+// ПОЛНАЯ ЛОГИКА
 // ============================================================
 const API = '/api';
 let token = localStorage.getItem('token');
@@ -342,7 +359,7 @@ async function handleAuth() {
 function logout() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
   token = null; currentUser = null; if (eventSource) { eventSource.close(); eventSource = null; }
-  document.getElementById('authContainer').style.display = 'block';
+  document.getElementById('authContainer').style.display = 'flex';
   document.getElementById('appContainer').style.display = 'none';
 }
 
@@ -401,13 +418,13 @@ function renderContacts() {
   container.innerHTML = contacts.map(c => {
     const id = c.contact_id; const name = c.name || 'Без имени'; const nick = c.nickname || 'unknown'; const last = c.last_message || ''; const photo = c.photo || '';
     return '<div class="contact" data-id="' + id + '" data-name="' + name + '" data-nick="' + nick + '" data-photo="' + photo + '">' +
-      '<div class="left"><div class="avatar">' + (photo ? '<img src="' + photo + '" />' : name.charAt(0).toUpperCase()) + '</div>' +
+      '<div class="left"><div class="avatar-sm">' + (photo ? '<img src="' + photo + '" />' : name.charAt(0).toUpperCase()) + '</div>' +
       '<div class="info"><div class="name">' + name + '</div><div class="nickname">@' + nick + '</div>' +
       (last ? '<div class="last-msg">' + last.slice(0,40) + (last.length>40?'...':'') + '</div>' : '') + '</div></div>' +
       (last ? '<span class="status-icon">' + (c.last_message_read ? '✅' : '⏳') + '</span>' : '') +
       '</div>';
   }).join('');
-  document.querySelectorAll('.contact').forEach(el => {
+  document.querySelectorAll('#contactsList .contact').forEach(el => {
     el.addEventListener('click', function() {
       selectUser({ id: parseInt(this.dataset.id), name: this.dataset.name, nickname: this.dataset.nick, photo: this.dataset.photo });
     });
@@ -423,7 +440,7 @@ async function searchUsers() {
 function selectUser(user) {
   if (!user || !user.id) return showError('Ошибка: нет ID');
   selectedUser = user; selectedChannel = null;
-  document.getElementById('chatView').style.display = 'block';
+  document.getElementById('chatView').style.display = 'flex';
   document.getElementById('contactsView').style.display = 'none';
   document.getElementById('selectedChatName').textContent = user.name;
   document.getElementById('selectedChatSub').textContent = '@' + user.nickname;
@@ -449,7 +466,7 @@ function renderMessages() {
   container.innerHTML = messages.map(m => {
     const isMy = m.from_user === currentUser.id;
     let html = m.content || '';
-    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" style="max-width:150px;border-radius:8px;margin-top:4px;display:block;cursor:pointer;" />'; }
+    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" />'; }
     if (m.is_voice && m.file_url) { html += '<audio controls><source src="' + m.file_url + '" type="' + (m.file_type || 'audio/webm') + '" /></audio>'; }
     return '<div class="message ' + (isMy ? 'my' : 'other') + '">' +
       (!isMy ? '<div class="sender">' + (m.from_name || 'Собеседник') + '</div>' : '') +
@@ -457,7 +474,7 @@ function renderMessages() {
       '<div class="time">' + formatTime(m.timestamp) + (isMy ? ' <span class="status-icon">' + (m.read_at ? '✅✅' : '✅') + '</span>' : '') + '</div></div>';
   }).join('');
   container.scrollTop = container.scrollHeight;
-  document.querySelectorAll('.file-img').forEach(el => {
+  document.querySelectorAll('#messagesList .file-img').forEach(el => {
     el.addEventListener('click', function() { openFullscreen(this.src); });
   });
 }
@@ -480,7 +497,7 @@ function renderContactsTab() {
   container.innerHTML = allUsers.map(u => { const photo = u.photo || ''; return '<div class="contact-card" data-id="' + u.id + '">' +
     '<div class="avatar-md">' + (photo ? '<img src="' + photo + '" />' : u.name.charAt(0).toUpperCase()) + '</div>' +
     '<div class="info"><div class="name">' + u.name + '</div><div class="nickname">@' + u.nickname + '</div></div></div>'; }).join('');
-  document.querySelectorAll('.contact-card').forEach(el => {
+  document.querySelectorAll('#contactsListTab .contact-card').forEach(el => {
     el.addEventListener('click', function() {
       const id = parseInt(this.dataset.id);
       const user = allUsers.find(u => u.id === id);
@@ -498,7 +515,7 @@ function filterContacts() {
   container.innerHTML = filtered.map(u => { const photo = u.photo || ''; return '<div class="contact-card" data-id="' + u.id + '">' +
     '<div class="avatar-md">' + (photo ? '<img src="' + photo + '" />' : u.name.charAt(0).toUpperCase()) + '</div>' +
     '<div class="info"><div class="name">' + u.name + '</div><div class="nickname">@' + u.nickname + '</div></div></div>'; }).join('');
-  document.querySelectorAll('.contact-card').forEach(el => {
+  document.querySelectorAll('#contactsListTab .contact-card').forEach(el => {
     el.addEventListener('click', function() {
       const id = parseInt(this.dataset.id);
       const user = allUsers.find(u => u.id === id);
@@ -516,19 +533,20 @@ function renderChannels() {
   const container = document.getElementById('channelsList');
   if (!container) return;
   if (channels.length === 0) { container.innerHTML = '<div class="empty"><span class="icon">📢</span>У вас нет каналов</div>'; return; }
-  container.innerHTML = channels.map(c => '<div class="contact" data-id="' + c.id + '" data-name="' + c.name + '" data-nick="' + (c.nickname||'') + '" data-private="' + c.is_private + '">' +
-    '<div class="left"><div class="info"><div class="name">' + c.name + '</div><div class="nickname">' + (c.nickname ? '@' + c.nickname : 'Приватный') + '</div></div></div>' +
+  container.innerHTML = channels.map(c => '<div class="contact" data-id="' + c.id + '" data-name="' + c.name + '" data-nick="' + (c.nickname||'') + '" data-photo="' + (c.photo||'') + '" data-private="' + c.is_private + '">' +
+    '<div class="left"><div class="avatar-sm">' + (c.photo ? '<img src="' + c.photo + '" />' : '📢') + '</div>' +
+    '<div class="info"><div class="name">' + c.name + '</div><div class="nickname">' + (c.nickname ? '@' + c.nickname : 'Приватный') + '</div></div></div>' +
     '<span class="badge">' + (c.is_private ? '🔒' : '🌐') + '</span></div>').join('');
   document.querySelectorAll('#channelsList .contact').forEach(el => {
     el.addEventListener('click', function() {
-      selectChannel({ id: parseInt(this.dataset.id), name: this.dataset.name, nickname: this.dataset.nick, is_private: this.dataset.private === 'true' });
+      selectChannel({ id: parseInt(this.dataset.id), name: this.dataset.name, nickname: this.dataset.nick, photo: this.dataset.photo, is_private: this.dataset.private === 'true' });
     });
   });
 }
 
 function selectChannel(channel) {
   selectedChannel = channel; selectedUser = null;
-  document.getElementById('channelChatView').style.display = 'block';
+  document.getElementById('channelChatView').style.display = 'flex';
   document.getElementById('channelListView').style.display = 'none';
   document.getElementById('selectedChannelName').textContent = channel.name;
   document.getElementById('selectedChannelSub').textContent = channel.nickname ? '@' + channel.nickname : 'Приватный канал';
@@ -553,7 +571,7 @@ function renderChannelMessages() {
   container.innerHTML = channelMessages.map(m => {
     const isMy = m.from_user === currentUser.id;
     let html = m.content || '';
-    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" style="max-width:150px;border-radius:8px;margin-top:4px;display:block;cursor:pointer;" />'; }
+    if (m.file_url && m.file_type?.startsWith('image/')) { html += '<img src="' + m.file_url + '" class="file-img" />'; }
     if (m.is_voice && m.file_url) { html += '<audio controls><source src="' + m.file_url + '" type="' + (m.file_type || 'audio/webm') + '" /></audio>'; }
     return '<div class="message ' + (isMy ? 'my' : 'other') + '">' +
       (!isMy ? '<div class="sender">' + (m.from_name || 'Администратор') + '</div>' : '') +
@@ -572,18 +590,46 @@ async function sendChannelMessage() {
   try { await request('/channel/message', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, from_user: currentUser.id, content }) }); document.getElementById('channelMessageInput').value = ''; loadChannelMessages(selectedChannel.id); } catch(e) { showError(e.message); }
 }
 
-// ===== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА =====
+// ===== СОЗДАНИЕ/РЕДАКТИРОВАНИЕ КАНАЛА С ФОТО =====
 function showCreateChannelModal() { document.getElementById('createChannelModal').classList.add('active'); }
 function closeCreateChannelModal() { document.getElementById('createChannelModal').classList.remove('active'); }
-function showEditChannelModal() { if (!selectedChannel) return; document.getElementById('editChannelName').value = selectedChannel.name || ''; document.getElementById('editChannelNickname').value = selectedChannel.nickname || ''; document.getElementById('editChannelPrivate').checked = selectedChannel.is_private || false; document.getElementById('editChannelModal').classList.add('active'); }
+function showEditChannelModal() { if (!selectedChannel) return; document.getElementById('editChannelName').value = selectedChannel.name || ''; document.getElementById('editChannelNickname').value = selectedChannel.nickname || ''; document.getElementById('editChannelPrivate').checked = selectedChannel.is_private || false; if (selectedChannel.photo) { document.getElementById('editChannelAvatarPreview').innerHTML = '<img src="' + selectedChannel.photo + '" />'; } else { document.getElementById('editChannelAvatarPreview').innerHTML = '📢'; } document.getElementById('editChannelModal').classList.add('active'); }
 function closeEditChannelModal() { document.getElementById('editChannelModal').classList.remove('active'); }
+
+let channelPhotoData = null;
+let editChannelPhotoData = null;
+
+document.getElementById('channelPhotoInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('channelAvatarPreview').innerHTML = '<img src="' + ev.target.result + '" />';
+    channelPhotoData = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('editChannelPhotoInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('editChannelAvatarPreview').innerHTML = '<img src="' + ev.target.result + '" />';
+    editChannelPhotoData = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
 async function createChannel() {
   const name = document.getElementById('channelName').value.trim();
   const nickname = document.getElementById('channelNickname').value.trim();
   const isPrivate = document.getElementById('channelPrivate').checked;
   if (!name) return showError('Введите название');
-  try { const data = await request('/channel/create', { method: 'POST', body: JSON.stringify({ name, nickname: nickname || undefined, is_private: isPrivate, created_by: currentUser.id }) }); if (data.success) { showError('✅ Канал создан!', true); closeCreateChannelModal(); document.getElementById('channelName').value = ''; document.getElementById('channelNickname').value = ''; document.getElementById('channelPrivate').checked = false; switchTab('channels'); loadChannels(); } } catch(e) { showError(e.message); }
+  try { 
+    const data = await request('/channel/create', { method: 'POST', body: JSON.stringify({ name, nickname: nickname || undefined, is_private: isPrivate, created_by: currentUser.id, photo: channelPhotoData || null }) });
+    if (data.success) { showError('✅ Канал создан!', true); closeCreateChannelModal(); document.getElementById('channelName').value = ''; document.getElementById('channelNickname').value = ''; document.getElementById('channelPrivate').checked = false; channelPhotoData = null; document.getElementById('channelAvatarPreview').innerHTML = '📢'; switchTab('channels'); loadChannels(); } 
+  } catch(e) { showError(e.message); }
 }
 
 async function saveChannelChanges() {
@@ -591,7 +637,10 @@ async function saveChannelChanges() {
   const nickname = document.getElementById('editChannelNickname').value.trim();
   const isPrivate = document.getElementById('editChannelPrivate').checked;
   if (!name) return showError('Введите название');
-  try { const data = await request('/channel/update', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, user_id: currentUser.id, name, nickname: nickname || null, is_private: isPrivate }) }); if (data.success) { showError('✅ Канал обновлён!', true); closeEditChannelModal(); selectedChannel = data.channel; document.getElementById('selectedChannelName').textContent = selectedChannel.name; document.getElementById('selectedChannelSub').textContent = selectedChannel.nickname ? '@' + selectedChannel.nickname : 'Приватный канал'; loadChannels(); } } catch(e) { showError(e.message); }
+  try { 
+    const data = await request('/channel/update', { method: 'POST', body: JSON.stringify({ channel_id: selectedChannel.id, user_id: currentUser.id, name, nickname: nickname || null, is_private: isPrivate, photo: editChannelPhotoData || null }) });
+    if (data.success) { showError('✅ Канал обновлён!', true); closeEditChannelModal(); selectedChannel = data.channel; document.getElementById('selectedChannelName').textContent = selectedChannel.name; document.getElementById('selectedChannelSub').textContent = selectedChannel.nickname ? '@' + selectedChannel.nickname : 'Приватный канал'; editChannelPhotoData = null; loadChannels(); } 
+  } catch(e) { showError(e.message); }
 }
 
 // ===== ПРОФИЛЬ =====
@@ -692,42 +741,34 @@ function openFullscreen(src) {
 }
 
 // ============================================================
-// НАВЕШИВАНИЕ ВСЕХ КНОПОК (addEventListener)
+// НАВЕШИВАНИЕ ВСЕХ КНОПОК
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
-
-  // АВТОРИЗАЦИЯ
   document.getElementById('authBtn').addEventListener('click', function(e) { e.preventDefault(); handleAuth(); });
   document.getElementById('toggleAuth').addEventListener('click', function(e) { e.preventDefault(); toggleMode(); });
   document.getElementById('logoutBtn').addEventListener('click', function(e) { e.preventDefault(); logout(); });
   document.getElementById('password').addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); handleAuth(); } });
 
-  // ВКЛАДКИ
   document.getElementById('tabChatsBtn').addEventListener('click', function() { switchTab('chats'); });
   document.getElementById('tabContactsBtn').addEventListener('click', function() { switchTab('contacts'); });
   document.getElementById('tabChannelsBtn').addEventListener('click', function() { switchTab('channels'); });
   document.getElementById('tabProfileBtn').addEventListener('click', function() { switchTab('profile'); });
   document.getElementById('profileTabBtn').addEventListener('click', function() { switchTab('profile'); });
 
-  // ЧАТЫ
   document.getElementById('searchBtn').addEventListener('click', searchUsers);
   document.getElementById('searchInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchUsers(); });
   document.getElementById('backToChatsBtn').addEventListener('click', goBackToChats);
   document.getElementById('sendMsgBtn').addEventListener('click', sendMessage);
   document.getElementById('messageInput').addEventListener('keydown', function(e) { if (e.key === 'Enter') sendMessage(); });
 
-  // ФОТО
   document.getElementById('attachBtn').addEventListener('click', toggleAttachMenu);
   document.getElementById('photoUploadBtn').addEventListener('click', triggerFileUpload);
   document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 
-  // ГОЛОСОВЫЕ
   document.getElementById('voiceBtn').addEventListener('click', toggleVoiceRecord);
 
-  // КОНТАКТЫ
   document.getElementById('contactsSearch').addEventListener('input', filterContacts);
 
-  // КАНАЛЫ
   document.getElementById('createChannelBtn').addEventListener('click', showCreateChannelModal);
   document.getElementById('closeCreateChannelBtn').addEventListener('click', closeCreateChannelModal);
   document.getElementById('createChannelSubmitBtn').addEventListener('click', createChannel);
@@ -738,36 +779,27 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('saveChannelChangesBtn').addEventListener('click', saveChannelChanges);
   document.getElementById('channelEditBtn').addEventListener('click', showEditChannelModal);
 
-  // ПРОФИЛЬ
   document.getElementById('profileAvatar').addEventListener('click', function() { document.getElementById('profilePhotoInput').click(); });
   document.getElementById('changePhotoHint').addEventListener('click', function() { document.getElementById('profilePhotoInput').click(); });
   document.getElementById('profilePhotoInput').addEventListener('change', updateProfilePhoto);
   document.getElementById('saveProfileBtn').addEventListener('click', saveProfile);
 
-  // МОДАЛКИ
   document.getElementById('channelNickname').addEventListener('input', function() {
     document.getElementById('channelPreview').textContent = this.value || 'никнейм';
   });
 
-  // КЛИК ВНЕ МОДАЛКИ ДЛЯ ЗАКРЫТИЯ
   document.querySelectorAll('.modal-overlay').forEach(modal => {
     modal.addEventListener('click', function(e) {
-      if (e.target === this) {
-        this.classList.remove('active');
-      }
+      if (e.target === this) { this.classList.remove('active'); }
     });
   });
-
 });
 
-// ===== ПРОВЕРКА АВТОРИЗАЦИИ =====
 if (token && localStorage.getItem('user')) {
   try {
     currentUser = JSON.parse(localStorage.getItem('user'));
     initApp();
-  } catch(e) {
-    logout();
-  }
+  } catch(e) { logout(); }
 }
 </script>
 </body>
@@ -775,9 +807,39 @@ if (token && localStorage.getItem('user')) {
 
 // ========== ГЛАВНАЯ ==========
 app.get('/', (req, res) => { res.send(HTML); });
+
+// ========== MANIFEST ДЛЯ PWA ==========
+app.get('/manifest.json', (req, res) => {
+  res.json({
+    name: 'RU Мессенджер',
+    short_name: 'RU',
+    description: 'Современный мессенджер',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#0f0f0f',
+    theme_color: '#6c5ce7',
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+    ]
+  });
+});
+
+// ========== SERVICE WORKER ==========
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.send(`
+    const CACHE_NAME = 'ru-messenger-v1';
+    const urlsToCache = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+    self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(urlsToCache))); self.skipWaiting(); });
+    self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => { if(k !== CACHE_NAME) return caches.delete(k); })))); self.clients.claim(); });
+    self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
+  `);
+});
+
+// ========== API ==========
 app.get('/api/health', (req, res) => { res.json({ status: 'ok', timestamp: new Date().toISOString(), postgres: !!pool }); });
 
-// ========== ВСЕ API МАРШРУТЫ ==========
 app.post('/api/register', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { email, name, nickname, password } = req.body;
@@ -850,11 +912,11 @@ app.get('/api/search/:nickname', async (req, res) => {
 
 app.post('/api/channel/create', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
-  const { name, nickname, is_private, created_by } = req.body;
+  const { name, nickname, is_private, created_by, photo } = req.body;
   if (!name || !created_by) return res.status(400).json({ error: 'Название и создатель обязательны' });
   try {
     const inviteCode = is_private ? uuidv4().slice(0,8) : null;
-    const result = await pool.query('INSERT INTO channels (name, nickname, is_private, invite_code, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, nickname, is_private, invite_code', [name, nickname || null, is_private || false, inviteCode, created_by]);
+    const result = await pool.query('INSERT INTO channels (name, nickname, is_private, invite_code, created_by, photo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, nickname, is_private, invite_code, photo', [name, nickname || null, is_private || false, inviteCode, created_by, photo || null]);
     await pool.query('INSERT INTO channel_members (channel_id, user_id) VALUES ($1, $2)', [result.rows[0].id, created_by]);
     res.json({ success: true, channel: result.rows[0], link: is_private ? '/c/join/' + result.rows[0].invite_code : '/c/' + nickname });
   } catch(e) {
@@ -865,7 +927,7 @@ app.post('/api/channel/create', async (req, res) => {
 
 app.post('/api/channel/update', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
-  const { channel_id, user_id, name, nickname, is_private } = req.body;
+  const { channel_id, user_id, name, nickname, is_private, photo } = req.body;
   if (!channel_id || !user_id) return res.status(400).json({ error: 'Канал и пользователь обязательны' });
   try {
     const check = await pool.query('SELECT created_by FROM channels WHERE id = $1', [channel_id]);
@@ -875,7 +937,7 @@ app.post('/api/channel/update', async (req, res) => {
       const dup = await pool.query('SELECT id FROM channels WHERE nickname = $1 AND id != $2', [nickname, channel_id]);
       if (dup.rows.length > 0) return res.status(400).json({ error: 'Никнейм занят' });
     }
-    await pool.query('UPDATE channels SET name = COALESCE($1, name), nickname = COALESCE($2, nickname), is_private = COALESCE($3, is_private) WHERE id = $4', [name, nickname, is_private, channel_id]);
+    await pool.query('UPDATE channels SET name = COALESCE($1, name), nickname = COALESCE($2, nickname), is_private = COALESCE($3, is_private), photo = COALESCE($4, photo) WHERE id = $5', [name, nickname, is_private, photo, channel_id]);
     const { rows } = await pool.query('SELECT * FROM channels WHERE id = $1', [channel_id]);
     res.json({ success: true, channel: rows[0] });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -885,7 +947,7 @@ app.get('/api/channels/:userId', async (req, res) => {
   if (!pool) return res.status(500).json({ error: 'База не подключена' });
   const { userId } = req.params;
   try {
-    const { rows } = await pool.query('SELECT c.id, c.name, c.nickname, c.is_private, c.created_by, c.created_at, u.name as creator_name FROM channels c JOIN channel_members cm ON c.id = cm.channel_id JOIN users u ON c.created_by = u.id WHERE cm.user_id = $1 ORDER BY c.created_at DESC', [userId]);
+    const { rows } = await pool.query('SELECT c.id, c.name, c.nickname, c.is_private, c.photo, c.created_by, c.created_at, u.name as creator_name FROM channels c JOIN channel_members cm ON c.id = cm.channel_id JOIN users u ON c.created_by = u.id WHERE cm.user_id = $1 ORDER BY c.created_at DESC', [userId]);
     res.json(rows);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
